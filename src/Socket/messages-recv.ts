@@ -31,6 +31,7 @@ import {
 	extractAddressingContext,
 	getCallStatusFromNode,
 	getHistoryMsg,
+	getContentType,
 	getNextPreKeys,
 	getStatusFromReceiptType,
 	hkdf,
@@ -66,6 +67,7 @@ import { makeMessagesSocket } from './messages-send'
 export const makeMessagesRecvSocket = (config: SocketConfig) => {
 	const { logger, retryRequestDelayMs, maxMsgRetryCount, getMessage, shouldIgnoreJid, enableAutoSessionRecreation } =
 		config
+	const shouldLogRawMessages = process.env.BAILEYS_DEBUG_RAW_MESSAGES === '1'
 	const sock = makeMessagesSocket(config)
 	const {
 		ev,
@@ -1171,6 +1173,9 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 	}
 
 	const handleMessage = async (node: BinaryNode) => {
+		if (shouldLogRawMessages) {
+			logger.debug({ node: binaryNodeToString(node) }, 'received raw message node')
+		}
 		if (shouldIgnoreJid(node.attrs.from!) && node.attrs.from !== S_WHATSAPP_NET) {
 			logger.debug({ key: node.attrs.key }, 'ignored message')
 			await sendMessageAck(node, NACK_REASONS.UnhandledError)
@@ -1222,6 +1227,15 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		try {
 			await messageMutex.mutex(async () => {
 				await decrypt()
+				if (shouldLogRawMessages && msg.message) {
+					logger.debug(
+						{
+							messageType: getContentType(msg.message),
+							message: msg.message
+						},
+						'decoded message content'
+					)
+				}
 				// message failed to decrypt
 				if (msg.messageStubType === proto.WebMessageInfo.StubType.CIPHERTEXT && msg.category !== 'peer') {
 					if (
