@@ -374,6 +374,29 @@ export const generateWAMessageContent = async (
 	options: MessageContentGenerationOptions
 ) => {
 	let m: WAMessageContent = {}
+	const normalizeCarouselCardMedia = async (card: proto.Message.IInteractiveMessage) => {
+		const header = card?.header as proto.Message.IInteractiveMessage.IHeader | undefined
+		if (!header) {
+			return card
+		}
+
+		const hasImage = !!header.imageMessage?.url
+		const hasVideo = !!header.videoMessage?.url
+		const hasDocument = !!header.documentMessage?.url
+		if (!hasImage && !hasVideo && !hasDocument) {
+			return card
+		}
+
+		const mediaMessage = hasImage
+			? { image: { url: header.imageMessage!.url! } }
+			: hasVideo
+				? { video: { url: header.videoMessage!.url! } }
+				: { document: { url: header.documentMessage!.url! }, fileName: header.documentMessage?.fileName }
+
+		const prepared = await prepareWAMessageMedia(mediaMessage as any, options)
+		const nextHeader = { ...header, ...prepared }
+		return { ...card, header: nextHeader }
+	}
 	if ('text' in message) {
 		const extContent = { text: message.text } as WATextMessage
 
@@ -491,7 +514,18 @@ export const generateWAMessageContent = async (
 				break
 		}
 	} else if ('interactiveMessage' in message) {
-		m.interactiveMessage = message.interactiveMessage
+		let interactive = message.interactiveMessage
+		if (interactive?.carouselMessage?.cards?.length) {
+			const cards = await Promise.all(interactive.carouselMessage.cards.map(normalizeCarouselCardMedia))
+			interactive = {
+				...interactive,
+				carouselMessage: {
+					...interactive.carouselMessage,
+					cards
+				}
+			}
+		}
+		m.interactiveMessage = interactive
 	} else if ('ptv' in message && message.ptv) {
 		const { videoMessage } = await prepareWAMessageMedia({ video: message.video }, options)
 		m.ptvMessage = videoMessage

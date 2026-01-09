@@ -118,6 +118,30 @@ describe('Reporting Utils', () => {
 			expect(result?.tag).toBe('reporting')
 		})
 
+		it('should create a reporting token for wrapped carousel messages', async () => {
+			const msg = withSecret({
+				documentWithCaptionMessage: {
+					message: {
+						interactiveMessage: {
+							body: { text: 'Hello' },
+							carouselMessage: {
+								messageVersion: 1,
+								carouselCardType: 1,
+								cards: [
+									{
+										body: { text: 'Card 1' },
+										nativeFlowMessage: { buttons: [] }
+									}
+								]
+							}
+						}
+					}
+				}
+			})
+			const result = await getMessageReportingToken(encode(msg), msg, createKey())
+			expect(result?.tag).toBe('reporting')
+		})
+
 		it('should produce consistent tokens for the same input', async () => {
 			const secret = randomBytes(32)
 			const msg = withSecret({ conversation: 'Test' }, secret)

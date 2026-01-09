@@ -612,7 +612,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			]
 		}
 
-		if (message.buttonsMessage || message.interactiveMessage?.nativeFlowMessage) {
+		if (message.buttonsMessage || message.interactiveMessage?.nativeFlowMessage || message.interactiveMessage?.carouselMessage) {
 			return [
 				{
 					tag: 'interactive',
