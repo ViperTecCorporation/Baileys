@@ -247,6 +247,10 @@ export const decryptMessageNode = (
 
 					if (tag === 'unavailable' && attrs.type === 'view_once') {
 						fullMessage.key.isViewOnce = true // TODO: remove from here and add a STUB TYPE
+						if (!fullMessage.messageStubType) {
+							fullMessage.messageStubType = proto.WebMessageInfo.StubType.FUTUREPROOF
+							fullMessage.messageStubParameters = ['view_once_unavailable']
+						}
 					}
 
 					if (attrs.count && tag === 'enc') {

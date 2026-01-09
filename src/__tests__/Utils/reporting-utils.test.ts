@@ -14,6 +14,7 @@ describe('Reporting Utils', () => {
 			['documentMessage', { documentMessage: { url: 'url', mimetype: 'application/pdf' } }],
 			['audioMessage', { audioMessage: { url: 'url', mimetype: 'audio/ogg' } }],
 			['stickerMessage', { stickerMessage: { url: 'url', mimetype: 'image/webp' } }],
+			['listMessage', { listMessage: { buttonText: 'Open', sections: [] } }],
 			['interactiveMessage', { interactiveMessage: { body: { text: 'Hello' } } }]
 		]
 
