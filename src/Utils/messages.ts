@@ -641,8 +641,15 @@ export const generateWAMessageContent = async (
 	}
 
 	if ('sections' in message && !!message.sections) {
+		const normalizedSections = message.sections.map(section => ({
+			...section,
+			rows: section.rows?.map(row => ({
+				...row,
+				id: row.id || (row as any).rowId
+			}))
+		}))
 		const listMessage: proto.Message.IListMessage = {
-			sections: message.sections,
+			sections: normalizedSections,
 			buttonText: message.buttonText,
 			title: message.title,
 			footerText: message.footer,
