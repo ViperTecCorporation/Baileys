@@ -13,7 +13,8 @@ describe('Reporting Utils', () => {
 			['videoMessage', { videoMessage: { url: 'url', mimetype: 'video/mp4' } }],
 			['documentMessage', { documentMessage: { url: 'url', mimetype: 'application/pdf' } }],
 			['audioMessage', { audioMessage: { url: 'url', mimetype: 'audio/ogg' } }],
-			['stickerMessage', { stickerMessage: { url: 'url', mimetype: 'image/webp' } }]
+			['stickerMessage', { stickerMessage: { url: 'url', mimetype: 'image/webp' } }],
+			['interactiveMessage', { interactiveMessage: { body: { text: 'Hello' } } }]
 		]
 
 		const excludedMessages: [string, proto.IMessage][] = [
@@ -96,6 +97,12 @@ describe('Reporting Utils', () => {
 			expect(content).toHaveLength(1)
 			expect(content[0]).toMatchObject({ tag: 'reporting_token', attrs: { v: '2' } })
 			expect(content[0].content).toHaveLength(16)
+		})
+
+		it('should create a reporting token for interactive messages', async () => {
+			const msg = withSecret({ interactiveMessage: { body: { text: 'Hello' } } })
+			const result = await getMessageReportingToken(encode(msg), msg, createKey())
+			expect(result?.tag).toBe('reporting')
 		})
 
 		it('should produce consistent tokens for the same input', async () => {
