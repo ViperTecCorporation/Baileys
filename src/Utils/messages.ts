@@ -645,7 +645,7 @@ export const generateWAMessageContent = async (
 			...section,
 			rows: section.rows?.map(row => ({
 				...row,
-				id: row.id || (row as any).rowId
+				rowId: (row as any).rowId || (row as any).id
 			}))
 		}))
 		const listMessage: proto.Message.IListMessage = {
