@@ -1148,11 +1148,16 @@ export const assertMediaContent = (content: proto.IMessage | null | undefined) =
 export const patchMessageForMdIfRequired = (message: proto.IMessage) => {
 	const requiresPatch = !!(message.buttonsMessage || message.listMessage || message.interactiveMessage)
 	if (requiresPatch) {
+		const messageContextInfo = message.messageContextInfo
+		const messageWithoutContext = { ...message }
+		if (messageContextInfo) {
+			delete (messageWithoutContext as proto.IMessage).messageContextInfo
+		}
+
 		message = {
+			...(messageContextInfo ? { messageContextInfo } : {}),
 			documentWithCaptionMessage: {
-				message: {
-					...message
-				}
+				message: messageWithoutContext
 			}
 		}
 	}
