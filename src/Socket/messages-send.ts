@@ -1,4 +1,5 @@
 import NodeCache from '@cacheable/node-cache'
+import { randomBytes } from 'crypto'
 import { Boom } from '@hapi/boom'
 import { proto } from '../../WAProto/index.js'
 import { DEFAULT_CACHE_TTLS, WA_DEFAULT_EPHEMERAL } from '../Defaults'
@@ -1012,6 +1013,13 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				})
 
 				logger.debug({ jid }, 'adding device identity')
+			}
+
+			if (reportingMessage && shouldIncludeReportingToken(reportingMessage)) {
+				reportingMessage.messageContextInfo = reportingMessage.messageContextInfo || {}
+				if (!reportingMessage.messageContextInfo.messageSecret) {
+					reportingMessage.messageContextInfo.messageSecret = randomBytes(32)
+				}
 			}
 
 			if (
