@@ -106,6 +106,18 @@ describe('Reporting Utils', () => {
 			expect(result?.tag).toBe('reporting')
 		})
 
+		it('should create a reporting token for wrapped list messages', async () => {
+			const msg = withSecret({
+				documentWithCaptionMessage: {
+					message: {
+						listMessage: { buttonText: 'Open', sections: [] }
+					}
+				}
+			})
+			const result = await getMessageReportingToken(encode(msg), msg, createKey())
+			expect(result?.tag).toBe('reporting')
+		})
+
 		it('should produce consistent tokens for the same input', async () => {
 			const secret = randomBytes(32)
 			const msg = withSecret({ conversation: 'Test' }, secret)

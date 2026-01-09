@@ -43,7 +43,7 @@ const reportingFields: ReportingField[] = [
 			{ f: 8, s: [{ f: 1 }, { f: 2 }] }
 		]
 	},
-	{ f: 53, s: [{ f: 1, m: true }] },
+	{ f: 53, s: [{ f: 1, s: [{ f: 36 }, { f: 42 }, { f: 45 }] }] },
 	{ f: 55, s: [{ f: 1, m: true }] },
 	{ f: 58, s: [{ f: 1, m: true }] },
 	{ f: 59, s: [{ f: 1, m: true }] },
