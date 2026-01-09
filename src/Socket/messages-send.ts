@@ -604,10 +604,14 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 
 	const createButtonNode = (message: proto.IMessage) => {
 		if (message.listMessage) {
+			const listType =
+				message.listMessage.listType === proto.Message.ListMessage.ListType.PRODUCT_LIST
+					? 'product_list'
+					: 'single_select'
 			return [
 				{
 					tag: 'list',
-					attrs: { type: 'product_list', v: '2' }
+					attrs: { type: listType, v: '2' }
 				}
 			]
 		}
