@@ -1170,8 +1170,6 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			return 'livelocation'
 		} else if (message.stickerMessage) {
 			return 'sticker'
-		} else if (message.listMessage) {
-			return 'list'
 		} else if (message.buttonsMessage) {
 			return 'buttons'
 		} else if (message.listResponseMessage) {
