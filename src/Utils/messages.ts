@@ -40,7 +40,7 @@ import {
 	getRawMediaUploadData,
 	type MediaDownloadOptions
 } from './messages-media'
-import { shouldIncludeReportingToken } from './reporting-utils'
+import { shouldIncludeReportingSecret } from './reporting-utils'
 
 type MediaUploadData = {
 	media: WAMediaUpload
@@ -731,7 +731,7 @@ export const generateWAMessageContent = async (
 		}
 	}
 
-	if (shouldIncludeReportingToken(m)) {
+	if (shouldIncludeReportingSecret(m)) {
 		m.messageContextInfo = m.messageContextInfo || {}
 		if (!m.messageContextInfo.messageSecret) {
 			m.messageContextInfo.messageSecret = randomBytes(32)

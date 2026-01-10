@@ -127,11 +127,16 @@ const hasListMessage = (message: proto.IMessage): boolean => {
 	return false
 }
 
-export const shouldIncludeReportingToken = (message: proto.IMessage): boolean =>
+const shouldIncludeReportingBase = (message: proto.IMessage): boolean =>
 	!message.reactionMessage &&
 	!message.encReactionMessage &&
 	!message.encEventResponseMessage &&
-	!message.pollUpdateMessage &&
+	!message.pollUpdateMessage
+
+export const shouldIncludeReportingSecret = (message: proto.IMessage): boolean => shouldIncludeReportingBase(message)
+
+export const shouldIncludeReportingToken = (message: proto.IMessage): boolean =>
+	shouldIncludeReportingBase(message) &&
 	(shouldEnableListReporting() || !hasListMessage(message))
 
 const generateMsgSecretKey = async (

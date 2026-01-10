@@ -1,10 +1,61 @@
 import { randomBytes } from 'crypto'
 import { proto } from '../../../WAProto'
 import type { WAMessageKey } from '../../Types'
-import { getMessageReportingToken, shouldIncludeReportingToken } from '../../Utils/reporting-utils'
+import { getMessageReportingToken, shouldIncludeReportingSecret, shouldIncludeReportingToken } from '../../Utils/reporting-utils'
 import type { BinaryNode } from '../../WABinary'
 
 describe('Reporting Utils', () => {
+	describe('shouldIncludeReportingSecret', () => {
+		const includedMessages: [string, proto.IMessage][] = [
+			['conversation', { conversation: 'Hello' }],
+			['extendedTextMessage', { extendedTextMessage: { text: 'Link' } }],
+			['imageMessage', { imageMessage: { url: 'url', mimetype: 'image/jpeg' } }],
+			['videoMessage', { videoMessage: { url: 'url', mimetype: 'video/mp4' } }],
+			['documentMessage', { documentMessage: { url: 'url', mimetype: 'application/pdf' } }],
+			['audioMessage', { audioMessage: { url: 'url', mimetype: 'audio/ogg' } }],
+			['stickerMessage', { stickerMessage: { url: 'url', mimetype: 'image/webp' } }],
+			['listMessage', { listMessage: { buttonText: 'Open', sections: [] } }],
+			['interactiveMessage', { interactiveMessage: { body: { text: 'Hello' } } }]
+		]
+
+		const excludedMessages: [string, proto.IMessage][] = [
+			['reactionMessage', { reactionMessage: { key: { id: 'id' }, text: 'ĐY'?' } }],
+			[
+				'encReactionMessage',
+				{
+					encReactionMessage: { targetMessageKey: { id: 'id' }, encPayload: Buffer.from('x'), encIv: Buffer.from('x') }
+				}
+			],
+			[
+				'pollUpdateMessage',
+				{
+					pollUpdateMessage: {
+						pollCreationMessageKey: { id: 'id' },
+						vote: { encPayload: Buffer.from('x'), encIv: Buffer.from('x') }
+					}
+				}
+			],
+			[
+				'encEventResponseMessage',
+				{
+					encEventResponseMessage: {
+						eventCreationMessageKey: { id: 'id' },
+						encPayload: Buffer.from('x'),
+						encIv: Buffer.from('x')
+					}
+				}
+			]
+		]
+
+		it.each(includedMessages)('should return true for %s', (_, message) => {
+			expect(shouldIncludeReportingSecret(message)).toBe(true)
+		})
+
+		it.each(excludedMessages)('should return false for %s', (_, message) => {
+			expect(shouldIncludeReportingSecret(message)).toBe(false)
+		})
+	})
+
 	describe('shouldIncludeReportingToken', () => {
 		const includedMessages: [string, proto.IMessage][] = [
 			['conversation', { conversation: 'Hello' }],
