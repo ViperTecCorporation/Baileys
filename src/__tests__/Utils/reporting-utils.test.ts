@@ -14,11 +14,11 @@ describe('Reporting Utils', () => {
 			['documentMessage', { documentMessage: { url: 'url', mimetype: 'application/pdf' } }],
 			['audioMessage', { audioMessage: { url: 'url', mimetype: 'audio/ogg' } }],
 			['stickerMessage', { stickerMessage: { url: 'url', mimetype: 'image/webp' } }],
-			['listMessage', { listMessage: { buttonText: 'Open', sections: [] } }],
 			['interactiveMessage', { interactiveMessage: { body: { text: 'Hello' } } }]
 		]
 
 		const excludedMessages: [string, proto.IMessage][] = [
+			['listMessage', { listMessage: { buttonText: 'Open', sections: [] } }],
 			['reactionMessage', { reactionMessage: { key: { id: 'id' }, text: '👍' } }],
 			[
 				'encReactionMessage',
@@ -53,6 +53,35 @@ describe('Reporting Utils', () => {
 
 		it.each(excludedMessages)('should return false for %s', (_, message) => {
 			expect(shouldIncludeReportingToken(message)).toBe(false)
+		})
+
+		it('should allow list reporting when env is enabled', () => {
+			const prev = process.env.BAILEYS_ENABLE_LIST_REPORTING
+			process.env.BAILEYS_ENABLE_LIST_REPORTING = '1'
+			expect(shouldIncludeReportingToken({ listMessage: { buttonText: 'Open', sections: [] } })).toBe(true)
+			if (typeof prev === 'undefined') {
+				delete process.env.BAILEYS_ENABLE_LIST_REPORTING
+			} else {
+				process.env.BAILEYS_ENABLE_LIST_REPORTING = prev
+			}
+		})
+
+		it('should return false for wrapped list messages when env is disabled', () => {
+			const prev = process.env.BAILEYS_ENABLE_LIST_REPORTING
+			delete process.env.BAILEYS_ENABLE_LIST_REPORTING
+			const message: proto.IMessage = {
+				documentWithCaptionMessage: {
+					message: {
+						listMessage: { buttonText: 'Open', sections: [] }
+					}
+				}
+			}
+			expect(shouldIncludeReportingToken(message)).toBe(false)
+			if (typeof prev === 'undefined') {
+				delete process.env.BAILEYS_ENABLE_LIST_REPORTING
+			} else {
+				process.env.BAILEYS_ENABLE_LIST_REPORTING = prev
+			}
 		})
 	})
 
