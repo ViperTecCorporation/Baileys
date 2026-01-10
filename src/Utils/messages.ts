@@ -1190,8 +1190,9 @@ export const patchMessageForMdIfRequired = (message: proto.IMessage) => {
 	const requiresPatch = !!(message.buttonsMessage || message.listMessage || message.interactiveMessage)
 	if (requiresPatch) {
 		const messageContextInfo = message.messageContextInfo
+		const shouldHoistContext = !message.listMessage
 		message = {
-			...(messageContextInfo ? { messageContextInfo } : {}),
+			...(shouldHoistContext && messageContextInfo ? { messageContextInfo } : {}),
 			documentWithCaptionMessage: {
 				message: {
 					...message
