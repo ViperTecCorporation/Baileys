@@ -604,14 +604,10 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 
 	const createButtonNode = (message: proto.IMessage) => {
 		if (message.listMessage) {
-			const listType =
-				message.listMessage.listType === proto.Message.ListMessage.ListType.PRODUCT_LIST
-					? 'product_list'
-					: 'single_select'
 			return [
 				{
 					tag: 'list',
-					attrs: { type: listType, v: '2' }
+					attrs: { type: 'product_list', v: '2' }
 				}
 			]
 		}
@@ -1170,6 +1166,8 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			return 'livelocation'
 		} else if (message.stickerMessage) {
 			return 'sticker'
+		} else if (message.listMessage) {
+			return 'list'
 		} else if (message.buttonsMessage) {
 			return 'buttons'
 		} else if (message.listResponseMessage) {
