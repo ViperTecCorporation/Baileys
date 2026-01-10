@@ -675,8 +675,17 @@ export const generateWAMessageContent = async (
 	}
 
 	if ('sections' in message && !!message.sections) {
+		const sections = message.sections.map(section => ({
+			title: section.title,
+			rows: section.rows.map(row => ({
+				title: row.title,
+				description: row.description,
+				rowId: (row as { rowId?: string; id?: string }).rowId || (row as { id?: string }).id || ''
+			}))
+		}))
+
 		const listMessage: proto.Message.IListMessage = {
-			sections: message.sections,
+			sections,
 			buttonText: message.buttonText,
 			title: message.title,
 			footerText: message.footer,
@@ -855,6 +864,8 @@ export const normalizeMessageContent = (content: WAMessageContent | null | undef
 		content = inner.message
 	}
 
+	normalizeInteractiveResponseMessage(content)
+
 	return content!
 
 	function getFutureProofMessage(message: typeof content) {
@@ -866,6 +877,58 @@ export const normalizeMessageContent = (content: WAMessageContent | null | undef
 			message?.viewOnceMessageV2Extension ||
 			message?.editedMessage
 		)
+	}
+}
+
+const normalizeInteractiveResponseMessage = (content: WAMessageContent | undefined) => {
+	const interactive = content?.interactiveResponseMessage?.nativeFlowResponseMessage
+	if (!interactive?.paramsJson) {
+		return
+	}
+
+	let params: Record<string, unknown> | undefined
+	try {
+		params = JSON.parse(interactive.paramsJson)
+	} catch {
+		return
+	}
+
+	if (!params || typeof params !== 'object') {
+		return
+	}
+
+	const id =
+		params.id ||
+		params.button_id ||
+		params.selected_row_id ||
+		params.row_id ||
+		params.selection_id ||
+		params.list_reply_id
+	const title = params.title || params.display_text || params.text
+	const description = params.description
+	const name = (interactive.name || '').toLowerCase()
+	const isList = name.includes('list') || name.includes('single_select') || !!params.row_id || !!params.selected_row_id
+	const isButton = name.includes('quick_reply') || name.includes('button') || !!params.button_id || !!params.id
+
+	if (isList && !content?.listResponseMessage && id) {
+		content.listResponseMessage = {
+			listType: proto.Message.ListResponseMessage.ListType.SINGLE_SELECT,
+			singleSelectReply: { selectedRowId: String(id) }
+		}
+		if (title) {
+			content.listResponseMessage.title = String(title)
+		}
+		if (description) {
+			content.listResponseMessage.description = String(description)
+		}
+	}
+
+	if (isButton && !content?.buttonsResponseMessage && id) {
+		content.buttonsResponseMessage = {
+			selectedButtonId: String(id),
+			type: proto.Message.ButtonsResponseMessage.Type.DISPLAY_TEXT,
+			selectedDisplayText: title ? String(title) : ''
+		}
 	}
 }
 
