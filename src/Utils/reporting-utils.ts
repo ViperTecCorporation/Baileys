@@ -98,35 +98,6 @@ const WIRE = {
 	FIXED32: 5
 } as const
 
-const shouldEnableListReporting = () => process.env.BAILEYS_ENABLE_LIST_REPORTING === '1'
-
-const getInnerMessage = (message: proto.IMessage): proto.IMessage | undefined =>
-	(message.ephemeralMessage?.message as proto.IMessage | undefined) ||
-	(message.viewOnceMessage?.message as proto.IMessage | undefined) ||
-	(message.viewOnceMessageV2?.message as proto.IMessage | undefined) ||
-	(message.viewOnceMessageV2Extension?.message as proto.IMessage | undefined) ||
-	(message.documentWithCaptionMessage?.message as proto.IMessage | undefined) ||
-	(message.editedMessage as proto.IMessage | undefined) ||
-	(message.deviceSentMessage?.message as proto.IMessage | undefined)
-
-const hasListMessage = (message: proto.IMessage): boolean => {
-	let current: proto.IMessage | undefined = message
-	for (let i = 0; i < 6 && current; i++) {
-		if (current.listMessage) {
-			return true
-		}
-
-		const inner = getInnerMessage(current)
-		if (!inner || inner === current) {
-			return false
-		}
-
-		current = inner
-	}
-
-	return false
-}
-
 const shouldIncludeReportingBase = (message: proto.IMessage): boolean =>
 	!message.reactionMessage &&
 	!message.encReactionMessage &&
@@ -136,8 +107,7 @@ const shouldIncludeReportingBase = (message: proto.IMessage): boolean =>
 export const shouldIncludeReportingSecret = (message: proto.IMessage): boolean => shouldIncludeReportingBase(message)
 
 export const shouldIncludeReportingToken = (message: proto.IMessage): boolean =>
-	shouldIncludeReportingBase(message) &&
-	(shouldEnableListReporting() || !hasListMessage(message))
+	shouldIncludeReportingBase(message)
 
 const generateMsgSecretKey = async (
 	modificationType: string,
