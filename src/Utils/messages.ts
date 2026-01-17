@@ -422,7 +422,6 @@ export const generateWAMessageContent = async (
 		const nextHeader = { ...header, ...prepared }
 		return { ...card, header: nextHeader }
 	}
-
 	if (hasNonNullishProperty(message, 'text')) {
 		const extContent = { text: message.text } as WATextMessage
 
@@ -477,15 +476,15 @@ export const generateWAMessageContent = async (
 			message.react.senderTimestampMs = Date.now()
 		}
 
-		options.logger?.debug(
-			{
-				reactKey: message.react.key,
-				reactText: message.react.text
-			},
-			'building reaction message'
-		)
-		m.reactionMessage = WAProto.Message.ReactionMessage.create(message.react)
-		options.logger?.debug({ reactionMessage: m.reactionMessage }, 'generated reaction message')
+	options.logger?.debug(
+		{
+			reactKey: message.react.key,
+			reactText: message.react.text
+		},
+		'building reaction message'
+	)
+	m.reactionMessage = WAProto.Message.ReactionMessage.create(message.react)
+	options.logger?.debug({ reactionMessage: m.reactionMessage }, 'generated reaction message')
 	} else if (hasNonNullishProperty(message, 'delete')) {
 		m.protocolMessage = {
 			key: message.delete,
@@ -546,21 +545,21 @@ export const generateWAMessageContent = async (
 					type: proto.Message.ButtonsResponseMessage.Type.DISPLAY_TEXT
 				}
 				break
-		}
-	} else if (hasNonNullishProperty(message, 'interactiveMessage')) {
-		let interactive = message.interactiveMessage
-		if (interactive?.carouselMessage?.cards?.length) {
-			const cards = await Promise.all(interactive.carouselMessage.cards.map(normalizeCarouselCardMedia))
-			interactive = {
-				...interactive,
-				carouselMessage: {
-					...interactive.carouselMessage,
-					cards
-				}
+	}
+} else if (hasNonNullishProperty(message, 'interactiveMessage')) {
+	let interactive = message.interactiveMessage
+	if (interactive?.carouselMessage?.cards?.length) {
+		const cards = await Promise.all(interactive.carouselMessage.cards.map(normalizeCarouselCardMedia))
+		interactive = {
+			...interactive,
+			carouselMessage: {
+				...interactive.carouselMessage,
+				cards
 			}
 		}
+	}
 
-		m.interactiveMessage = interactive
+	m.interactiveMessage = interactive
 	} else if (hasOptionalProperty(message, 'ptv') && message.ptv) {
 		const { videoMessage } = await prepareWAMessageMedia({ video: message.video }, options)
 		m.ptvMessage = videoMessage
@@ -729,7 +728,6 @@ export const generateWAMessageContent = async (
 		options.logger?.debug({ listMessage }, 'generated list message')
 		m = { listMessage }
 	}
-
 	if (hasOptionalProperty(message, 'viewOnce') && !!message.viewOnce) {
 		m = { viewOnceMessage: { message: m } }
 	}
