@@ -9,7 +9,8 @@ import makeWASocket, {
 	jidNormalizedUser,
 	proto,
 	toBuffer,
-	useMultiFileAuthState
+	useMultiFileAuthState,
+	type WAMessage
 } from '../../index'
 
 jest.setTimeout(30_000)
@@ -331,8 +332,7 @@ describe('E2E Tests', () => {
 							{},
 							{
 								logger: sock.logger,
-								reuploadRequest: m => sock.updateMediaMessage(m)
-				}
+								reuploadRequest: m => sock.updateMediaMessage(m)				}
 			)
 
 			expect(Buffer.isBuffer(buffer)).toBe(true)
@@ -392,8 +392,7 @@ describe('E2E Tests', () => {
 							{},
 							{
 								logger: sock.logger,
-								reuploadRequest: m => sock.updateMediaMessage(m)
-				}
+								reuploadRequest: m => sock.updateMediaMessage(m)				}
 			)
 
 			expect(Buffer.isBuffer(buffer)).toBe(true)
@@ -575,7 +574,6 @@ describe('E2E Tests', () => {
 										)
 										if (msg) resolve(msg)
 									}
-
 				sock.ev.on('messages.upsert', videoListener)
 				timeoutId = setTimeout(() => reject(new Error('Timed out waiting for initial group image message')), 30_000)
 			})
@@ -598,7 +596,6 @@ describe('E2E Tests', () => {
 										)
 										if (msg) resolve(msg)
 									}
-
 				sock.ev.on('messages.upsert', commandListener)
 				timeoutId = setTimeout(() => reject(new Error('Timed out waiting for group command message')), 30_000)
 			})
