@@ -9,8 +9,7 @@ import makeWASocket, {
 	jidNormalizedUser,
 	proto,
 	toBuffer,
-	useMultiFileAuthState,
-	type WAMessage
+	useMultiFileAuthState
 } from '../../index'
 
 jest.setTimeout(30_000)
@@ -326,13 +325,13 @@ describe('E2E Tests', () => {
 
 			console.log('Received image message, attempting to download...')
 
-			const buffer = await downloadMediaMessage(
-				receivedMsg as WAMessage,
-				'buffer',
-				{},
-				{
-					logger: sock.logger,
-					reuploadRequest: m => sock.updateMediaMessage(m)
+						const buffer = await downloadMediaMessage(
+							receivedMsg,
+							'buffer',
+							{},
+							{
+								logger: sock.logger,
+								reuploadRequest: m => sock.updateMediaMessage(m)
 				}
 			)
 
@@ -387,13 +386,13 @@ describe('E2E Tests', () => {
 
 			console.log('Received LID image message, attempting to download...')
 
-			const buffer = await downloadMediaMessage(
-				receivedMsg as WAMessage,
-				'buffer',
-				{},
-				{
-					logger: sock.logger,
-					reuploadRequest: m => sock.updateMediaMessage(m)
+						const buffer = await downloadMediaMessage(
+							receivedMsg,
+							'buffer',
+							{},
+							{
+								logger: sock.logger,
+								reuploadRequest: m => sock.updateMediaMessage(m)
 				}
 			)
 
@@ -571,11 +570,11 @@ describe('E2E Tests', () => {
 			console.log(`Sending initial video message to group ${groupJid}...`)
 			const receivedVideoPromise = new Promise<proto.IWebMessageInfo>((resolve, reject) => {
 				videoListener = ({ messages }) => {
-					const msg = messages.find(
-						m => m.key!.remoteJid === groupJid && m.message?.videoMessage?.caption === originalCaption
-					)
-					if (msg) resolve(msg)
-				}
+										const msg = messages.find(
+											m => m.key.remoteJid === groupJid && m.message?.videoMessage?.caption === originalCaption
+										)
+										if (msg) resolve(msg)
+									}
 
 				sock.ev.on('messages.upsert', videoListener)
 				timeoutId = setTimeout(() => reject(new Error('Timed out waiting for initial group image message')), 30_000)
@@ -594,11 +593,11 @@ describe('E2E Tests', () => {
 			console.log('Sending command message as a reply in the group...')
 			const receivedCommandPromise = new Promise<proto.IWebMessageInfo>((resolve, reject) => {
 				commandListener = ({ messages }) => {
-					const msg = messages.find(
-						m => m.key!.remoteJid === groupJid && m.message?.extendedTextMessage?.text === commandText
-					)
-					if (msg) resolve(msg)
-				}
+										const msg = messages.find(
+											m => m.key.remoteJid === groupJid && m.message?.extendedTextMessage?.text === commandText
+										)
+										if (msg) resolve(msg)
+									}
 
 				sock.ev.on('messages.upsert', commandListener)
 				timeoutId = setTimeout(() => reject(new Error('Timed out waiting for group command message')), 30_000)
