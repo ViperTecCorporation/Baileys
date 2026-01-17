@@ -451,7 +451,15 @@ export const generateWAMessageContent = async (
 			message.react.senderTimestampMs = Date.now()
 		}
 
+		options.logger?.debug(
+			{
+				reactKey: message.react.key,
+				reactText: message.react.text
+			},
+			'building reaction message'
+		)
 		m.reactionMessage = WAProto.Message.ReactionMessage.create(message.react)
+		options.logger?.debug({ reactionMessage: m.reactionMessage }, 'generated reaction message')
 	} else if ('delete' in message) {
 		m.protocolMessage = {
 			key: message.delete,
@@ -675,17 +683,8 @@ export const generateWAMessageContent = async (
 	}
 
 	if ('sections' in message && !!message.sections) {
-		const sections = message.sections.map(section => ({
-			title: section.title,
-			rows: section.rows.map(row => ({
-				title: row.title,
-				description: row.description,
-				rowId: (row as { rowId?: string; id?: string }).rowId || (row as { id?: string }).id || ''
-			}))
-		}))
-
 		const listMessage: proto.Message.IListMessage = {
-			sections,
+			sections: message.sections,
 			buttonText: message.buttonText,
 			title: message.title,
 			footerText: message.footer,
@@ -693,6 +692,7 @@ export const generateWAMessageContent = async (
 			listType: proto.Message.ListMessage.ListType.SINGLE_SELECT
 		}
 
+		options.logger?.debug({ listMessage }, 'generated list message')
 		m = { listMessage }
 	}
 
