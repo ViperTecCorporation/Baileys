@@ -1284,11 +1284,26 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		},
 		sendMessage: async (jid: string, content: AnyMessageContent, options: MiscMessageGenerationOptions = {}) => {
 			const userJid = authState.creds.me!.id
+			let targetJid = jid
+			if (typeof content === 'object' && 'react' in content && content.react?.key) {
+				const reactKey = content.react.key
+				if (reactKey.participant === '') {
+					delete (reactKey as { participant?: string }).participant
+					logger?.warn({ reactKey }, 'cleared empty reaction participant')
+				}
+				if (reactKey.remoteJid && reactKey.remoteJid !== jid) {
+					logger?.warn(
+						{ jid, reactRemoteJid: reactKey.remoteJid },
+						'reaction target jid mismatch; using react key remoteJid'
+					)
+					targetJid = reactKey.remoteJid
+				}
+			}
 			if (
 				typeof content === 'object' &&
 				'disappearingMessagesInChat' in content &&
 				typeof content['disappearingMessagesInChat'] !== 'undefined' &&
-				isJidGroup(jid)
+				isJidGroup(targetJid)
 			) {
 				const { disappearingMessagesInChat } = content
 				const value =
@@ -1297,9 +1312,9 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 							? WA_DEFAULT_EPHEMERAL
 							: 0
 						: disappearingMessagesInChat
-				await groupToggleEphemeral(jid, value)
+				await groupToggleEphemeral(targetJid, value)
 			} else {
-				const fullMsg = await generateWAMessage(jid, content, {
+				const fullMsg = await generateWAMessage(targetJid, content, {
 					logger,
 					userJid,
 					getUrlInfo: text =>
@@ -1357,7 +1372,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					} as BinaryNode)
 				}
 
-				await relayMessage(jid, fullMsg.message!, {
+				await relayMessage(targetJid, fullMsg.message!, {
 					messageId: fullMsg.key.id!,
 					useCachedGroupMetadata: options.useCachedGroupMetadata,
 					additionalAttributes,
