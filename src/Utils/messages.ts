@@ -706,14 +706,22 @@ export const generateWAMessageContent = async (
 		}
 	}
 
-	if ('sections' in message && !!message.sections) {
+	const hasSections = 'sections' in message && !!message.sections
+	const hasProductListInfo = 'productListInfo' in message && !!message.productListInfo
+	if (hasSections || hasProductListInfo) {
+		const listType = hasSections
+			? proto.Message.ListMessage.ListType.PRODUCT_LIST
+			: hasProductListInfo
+				? proto.Message.ListMessage.ListType.PRODUCT_LIST
+				: proto.Message.ListMessage.ListType.SINGLE_SELECT
 		const listMessage: proto.Message.IListMessage = {
-			sections: message.sections,
+			sections: hasSections ? message.sections : undefined,
+			productListInfo: hasProductListInfo ? message.productListInfo : undefined,
 			buttonText: message.buttonText,
 			title: message.title,
 			footerText: message.footer,
 			description: (message as { text?: string }).text,
-			listType: proto.Message.ListMessage.ListType.SINGLE_SELECT
+			listType
 		}
 
 		options.logger?.debug({ listMessage }, 'generated list message')

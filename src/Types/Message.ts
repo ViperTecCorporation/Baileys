@@ -140,6 +140,12 @@ type Listable = {
 
 	/** Text of the button on the list (required) */
 	buttonText?: string
+
+	/** List type (single select or product list) */
+	listType?: proto.Message.ListMessage.ListType
+
+	/** Product list info for product lists */
+	productListInfo?: proto.Message.ListMessage.IProductListInfo
 }
 
 type Editable = {
