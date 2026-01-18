@@ -399,7 +399,7 @@ export const generateWAMessageContent = async (
 ) => {
 	let m: WAMessageContent = {}
 	const normalizeCarouselCardMedia = async (card: proto.Message.IInteractiveMessage) => {
-		const header = card?.header as proto.Message.IInteractiveMessage.IHeader | undefined
+		const header = card?.header as proto.Message.InteractiveMessage.IHeader | undefined
 		if (!header) {
 			return card
 		}
@@ -888,9 +888,13 @@ export const normalizeMessageContent = (content: WAMessageContent | null | undef
 		content = inner.message
 	}
 
+	if (!content) {
+		return undefined
+	}
+
 	normalizeInteractiveResponseMessage(content)
 
-	return content!
+	return content
 
 	function getFutureProofMessage(message: typeof content) {
 		return (
@@ -904,8 +908,12 @@ export const normalizeMessageContent = (content: WAMessageContent | null | undef
 	}
 }
 
-const normalizeInteractiveResponseMessage = (content: WAMessageContent | undefined) => {
-	const interactive = content?.interactiveResponseMessage?.nativeFlowResponseMessage
+const normalizeInteractiveResponseMessage = (content: WAMessageContent | null | undefined) => {
+	if (!content) {
+		return
+	}
+
+	const interactive = content.interactiveResponseMessage?.nativeFlowResponseMessage
 	if (!interactive?.paramsJson) {
 		return
 	}
@@ -934,7 +942,7 @@ const normalizeInteractiveResponseMessage = (content: WAMessageContent | undefin
 	const isList = name.includes('list') || name.includes('single_select') || !!params.row_id || !!params.selected_row_id
 	const isButton = name.includes('quick_reply') || name.includes('button') || !!params.button_id || !!params.id
 
-	if (isList && !content?.listResponseMessage && id) {
+	if (isList && !content.listResponseMessage && id) {
 		content.listResponseMessage = {
 			listType: proto.Message.ListResponseMessage.ListType.SINGLE_SELECT,
 			singleSelectReply: { selectedRowId: String(id) }
@@ -947,7 +955,7 @@ const normalizeInteractiveResponseMessage = (content: WAMessageContent | undefin
 		}
 	}
 
-	if (isButton && !content?.buttonsResponseMessage && id) {
+	if (isButton && !content.buttonsResponseMessage && id) {
 		content.buttonsResponseMessage = {
 			selectedButtonId: String(id),
 			type: proto.Message.ButtonsResponseMessage.Type.DISPLAY_TEXT,
