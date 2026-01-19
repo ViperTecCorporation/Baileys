@@ -42,12 +42,6 @@ import {
 } from './messages-media'
 import { shouldIncludeReportingSecret } from './reporting-utils'
 
-type ExtractByKey<T, K extends PropertyKey> = T extends Record<K, any> ? T : never
-type RequireKey<T, K extends keyof T> = T & {
-	[P in K]-?: Exclude<T[P], null | undefined>
-}
-
-type WithKey<T, K extends PropertyKey> = T extends unknown ? (K extends keyof T ? RequireKey<T, K> : never) : never
 
 type ExtractByKey<T, K extends PropertyKey> = T extends Record<K, any> ? T : never
 type RequireKey<T, K extends keyof T> = T & {
