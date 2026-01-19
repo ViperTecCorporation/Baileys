@@ -1,7 +1,11 @@
 import { randomBytes } from 'crypto'
 import { proto } from '../../../WAProto'
 import type { WAMessageKey } from '../../Types'
-import { getMessageReportingToken, shouldIncludeReportingSecret, shouldIncludeReportingToken } from '../../Utils/reporting-utils'
+import {
+	getMessageReportingToken,
+	shouldIncludeReportingSecret,
+	shouldIncludeReportingToken
+} from '../../Utils/reporting-utils'
 import type { BinaryNode } from '../../WABinary'
 
 describe('Reporting Utils', () => {

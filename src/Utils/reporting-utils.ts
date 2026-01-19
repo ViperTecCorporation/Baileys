@@ -106,8 +106,7 @@ const shouldIncludeReportingBase = (message: proto.IMessage): boolean =>
 
 export const shouldIncludeReportingSecret = (message: proto.IMessage): boolean => shouldIncludeReportingBase(message)
 
-export const shouldIncludeReportingToken = (message: proto.IMessage): boolean =>
-	shouldIncludeReportingBase(message)
+export const shouldIncludeReportingToken = (message: proto.IMessage): boolean => shouldIncludeReportingBase(message)
 
 const generateMsgSecretKey = async (
 	modificationType: string,
@@ -331,8 +330,8 @@ export const getMessageReportingToken = async (
 	const reportingSecret = await generateMsgSecretKey(ENC_SECRET_REPORT_TOKEN, key.id, from, to, msgSecret)
 
 	let content = extractReportingTokenContent(msgProtobuf, compiledReportingFields)
-	if ((!content || content.length === 0) && (message as proto.IMessage).documentWithCaptionMessage?.message) {
-		const inner = (message as proto.IMessage).documentWithCaptionMessage!.message as proto.IMessage
+	if ((!content || content.length === 0) && message.documentWithCaptionMessage?.message) {
+		const inner = message.documentWithCaptionMessage.message
 		const fallback = {
 			...inner,
 			messageContextInfo: message.messageContextInfo
@@ -340,6 +339,7 @@ export const getMessageReportingToken = async (
 		const encoded = Buffer.from(proto.Message.encode(fallback).finish())
 		content = extractReportingTokenContent(encoded, compiledReportingFields)
 	}
+
 	if (!content || content.length === 0) {
 		return null
 	}

@@ -11,7 +11,7 @@ const config: Config = {
 		'^(\\.{1,2}/.*)\\.js$': '$1',
 	},
 	transform: {
-		'^.+\\.tsx?$': [
+		'^.+\\.[jt]sx?$': [
 			'ts-jest',
 			{
 				useESM: true,
@@ -19,10 +19,10 @@ const config: Config = {
 					module: 'esnext',
 					verbatimModuleSyntax: false,
 					allowImportingTsExtensions: false,
+					allowJs: true,
 				},
 			},
 		],
-		'^.+\\.js$': ['ts-jest', { useESM: true }],
 	},
 	transformIgnorePatterns: [
 		'node_modules/(?!(protobufjs|long|@protobufjs|@types/long)/)',

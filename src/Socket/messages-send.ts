@@ -1,6 +1,6 @@
 import NodeCache from '@cacheable/node-cache'
-import { randomBytes } from 'crypto'
 import { Boom } from '@hapi/boom'
+import { randomBytes } from 'crypto'
 import { proto } from '../../WAProto/index.js'
 import { DEFAULT_CACHE_TTLS, WA_DEFAULT_EPHEMERAL } from '../Defaults'
 import type {
@@ -31,8 +31,8 @@ import {
 	getWAUploadToServer,
 	MessageRetryManager,
 	normalizeMessageContent,
-	patchMessageForMdIfRequired,
 	parseAndInjectE2ESessions,
+	patchMessageForMdIfRequired,
 	unixTimestampSeconds
 } from '../Utils'
 import { getUrlInfo } from '../Utils/link-preview'
@@ -616,7 +616,11 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			]
 		}
 
-		if (message.buttonsMessage || message.interactiveMessage?.nativeFlowMessage || message.interactiveMessage?.carouselMessage) {
+		if (
+			message.buttonsMessage ||
+			message.interactiveMessage?.nativeFlowMessage ||
+			message.interactiveMessage?.carouselMessage
+		) {
 			return [
 				{
 					tag: 'interactive',
@@ -1274,6 +1278,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					delete (reactKey as { participant?: string }).participant
 					logger?.warn({ reactKey }, 'cleared empty reaction participant')
 				}
+
 				if (reactKey.remoteJid && reactKey.remoteJid !== jid) {
 					logger?.warn(
 						{ jid, reactRemoteJid: reactKey.remoteJid },
@@ -1282,6 +1287,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					targetJid = reactKey.remoteJid
 				}
 			}
+
 			if (
 				typeof content === 'object' &&
 				'disappearingMessagesInChat' in content &&
@@ -1355,7 +1361,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					} as BinaryNode)
 				}
 
-				await relayMessage(targetJid, fullMsg.message!, {
+				await relayMessage(targetJid, fullMsg.message, {
 					messageId: fullMsg.key.id!,
 					useCachedGroupMetadata: options.useCachedGroupMetadata,
 					additionalAttributes,

@@ -30,8 +30,8 @@ import {
 	encodeSignedDeviceIdentity,
 	extractAddressingContext,
 	getCallStatusFromNode,
-	getHistoryMsg,
 	getContentType,
+	getHistoryMsg,
 	getNextPreKeys,
 	getStatusFromReceiptType,
 	hkdf,
@@ -1176,6 +1176,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		if (shouldLogRawMessages) {
 			logger.debug({ node: binaryNodeToString(node) }, 'received raw message node')
 		}
+
 		if (shouldIgnoreJid(node.attrs.from!) && node.attrs.from !== S_WHATSAPP_NET) {
 			logger.debug({ key: node.attrs.key }, 'ignored message')
 			await sendMessageAck(node, NACK_REASONS.UnhandledError)
@@ -1236,6 +1237,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 						'decoded message content'
 					)
 				}
+
 				// message failed to decrypt
 				if (msg.messageStubType === proto.WebMessageInfo.StubType.CIPHERTEXT && msg.category !== 'peer') {
 					if (

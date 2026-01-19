@@ -421,6 +421,7 @@ export const generateWAMessageContent = async (
 		const nextHeader = { ...header, ...prepared }
 		return { ...card, header: nextHeader }
 	}
+
 	if (hasNonNullishProperty(message, 'text')) {
 		const extContent = { text: message.text } as WATextMessage
 
@@ -557,6 +558,7 @@ export const generateWAMessageContent = async (
 				}
 			}
 		}
+
 		m.interactiveMessage = interactive
 	} else if (hasOptionalProperty(message, 'ptv') && message.ptv) {
 		const { videoMessage } = await prepareWAMessageMedia({ video: message.video }, options)
@@ -958,6 +960,7 @@ const normalizeInteractiveResponseMessage = (content: WAMessageContent | null | 
 		if (title) {
 			content.listResponseMessage.title = String(title)
 		}
+
 		if (description) {
 			content.listResponseMessage.description = String(description)
 		}
