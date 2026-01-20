@@ -712,11 +712,10 @@ export const generateWAMessageContent = async (
 	const hasSections = 'sections' in message && !!message.sections
 	const hasProductListInfo = 'productListInfo' in message && !!message.productListInfo
 	if (hasSections || hasProductListInfo) {
-		const listType = hasSections
-			? proto.Message.ListMessage.ListType.PRODUCT_LIST
-			: hasProductListInfo
-				? proto.Message.ListMessage.ListType.PRODUCT_LIST
-				: proto.Message.ListMessage.ListType.SINGLE_SELECT
+	// Sections without productListInfo are regular single-select lists.
+	const listType = hasProductListInfo
+		? proto.Message.ListMessage.ListType.PRODUCT_LIST
+		: proto.Message.ListMessage.ListType.SINGLE_SELECT
 		const listMessage: proto.Message.IListMessage = {
 			sections: hasSections ? message.sections : undefined,
 			productListInfo: hasProductListInfo ? message.productListInfo : undefined,
@@ -1290,13 +1289,14 @@ export const patchMessageForMdIfRequired = (message: proto.IMessage) => {
 	const requiresPatch = !!(message.buttonsMessage || message.listMessage || message.interactiveMessage)
 	if (requiresPatch) {
 		const messageContextInfo = message.messageContextInfo
-		const shouldHoistContext = !message.listMessage
+		const messageWithoutContext = { ...message }
+		if (messageContextInfo) {
+			delete (messageWithoutContext as proto.IMessage).messageContextInfo
+		}
 		message = {
-			...(shouldHoistContext && messageContextInfo ? { messageContextInfo } : {}),
+			...(messageContextInfo ? { messageContextInfo } : {}),
 			documentWithCaptionMessage: {
-				message: {
-					...message
-				}
+				message: messageWithoutContext
 			}
 		}
 	}
