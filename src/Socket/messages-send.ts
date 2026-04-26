@@ -612,7 +612,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		return { nodes, shouldIncludeDeviceIdentity }
 	}
 
-	const createButtonNode = (message: proto.IMessage) => {
+	const createButtonNode = (message: proto.IMessage): BinaryNode[] | null => {
 		if (message.listMessage) {
 			const listType =
 				message.listMessage.listType === proto.Message.ListMessage.ListType.PRODUCT_LIST
@@ -626,11 +626,23 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			]
 		}
 
-		if (
-			message.buttonsMessage ||
-			message.interactiveMessage?.nativeFlowMessage ||
-			message.interactiveMessage?.carouselMessage
-		) {
+		if (message.interactiveMessage?.carouselMessage) {
+			const decisionId = randomBytes(20).toString('hex')
+			return [
+				{
+					tag: 'interactive',
+					attrs: { type: 'native_flow', v: '1' },
+					content: [{ tag: 'native_flow', attrs: { v: '9', name: 'mixed' } }]
+				},
+				{
+					tag: 'quality_control',
+					attrs: { decision_id: decisionId },
+					content: [{ tag: 'decision_source', attrs: { value: 'df' } }]
+				}
+			]
+		}
+
+		if (message.buttonsMessage || message.interactiveMessage?.nativeFlowMessage) {
 			return [
 				{
 					tag: 'interactive',
@@ -641,6 +653,56 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		}
 
 		return null
+	}
+
+	const convertNativeFlowListToListMessage = (message: proto.IMessage) => {
+		const container =
+			message.viewOnceMessage?.message || message.viewOnceMessageV2?.message || message.viewOnceMessageV2Extension?.message || message
+		const interactive = container.interactiveMessage
+		const singleSelectButton = interactive?.nativeFlowMessage?.buttons?.find(button => button?.name === 'single_select')
+		if (!singleSelectButton?.buttonParamsJson) {
+			return false
+		}
+
+		let params: { title?: string; sections?: any[] }
+		try {
+			params = JSON.parse(singleSelectButton.buttonParamsJson)
+		} catch {
+			return false
+		}
+
+		const sections = params.sections
+			?.map(section => ({
+				title: section.title,
+				rows: section.rows?.map((row: any) => ({
+					rowId: row.rowId || row.id,
+					title: row.title,
+					description: row.description || ''
+				}))
+			}))
+			.filter(section => section.rows?.length)
+
+		if (!sections?.length) {
+			return false
+		}
+
+		const listMessage = proto.Message.ListMessage.fromObject({
+			title: interactive?.header?.title || '',
+			description: interactive?.body?.text || '',
+			buttonText: params.title || 'Menu',
+			footerText: interactive?.footer?.text || '',
+			listType: proto.Message.ListMessage.ListType.PRODUCT_LIST,
+			sections
+		})
+
+		message.listMessage = listMessage
+		message.messageContextInfo ||= container.messageContextInfo
+		delete message.viewOnceMessage
+		delete message.viewOnceMessageV2
+		delete message.viewOnceMessageV2Extension
+		delete message.interactiveMessage
+
+		return true
 	}
 
 	const relayMessage = async (
@@ -673,6 +735,11 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		msgId = msgId || generateMessageIDV2(meId)
 		useUserDevicesCache = useUserDevicesCache !== false
 		useCachedGroupMetadata = useCachedGroupMetadata !== false && !isStatus
+		const convertedNativeFlowList = convertNativeFlowListToListMessage(message)
+		const shouldForceCarouselDeviceIdentity = !!(
+			message.interactiveMessage?.carouselMessage ||
+			message.documentWithCaptionMessage?.message?.interactiveMessage?.carouselMessage
+		)
 
 		const participants: BinaryNode[] = []
 		const destinationJid = !isStatus ? finalJid : statusJid
@@ -1050,7 +1117,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				stanza.attrs.to = destinationJid
 			}
 
-			if (shouldIncludeDeviceIdentity) {
+			if (shouldIncludeDeviceIdentity || shouldForceCarouselDeviceIdentity) {
 				;(stanza.content as BinaryNode[]).push({
 					tag: 'device-identity',
 					attrs: {},
@@ -1190,7 +1257,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					attrs: {},
 					content: buttonContent
 				})
-				logger.debug({ jid }, 'adding biz node for buttons message')
+				logger.debug({ jid, convertedNativeFlowList }, 'adding biz node for buttons message')
 			}
 
 			if (innerMessage.buttonsMessage || innerMessage.listMessage || innerMessage.interactiveMessage) {

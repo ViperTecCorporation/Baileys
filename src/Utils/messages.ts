@@ -20,6 +20,8 @@ import type {
 	MessageGenerationOptionsFromContent,
 	MessageUserReceipt,
 	MessageWithContextInfo,
+	NativeButton,
+	NativeCarouselMessageOptions,
 	WAMediaUpload,
 	WAMessage,
 	WAMessageContent,
@@ -34,10 +36,12 @@ import type { ILogger } from './logger'
 import {
 	downloadContentFromMessage,
 	encryptedStream,
+	extractImageThumb,
 	generateThumbnail,
 	getAudioDuration,
 	getAudioWaveform,
 	getRawMediaUploadData,
+	getStream,
 	type MediaDownloadOptions
 } from './messages-media'
 import { shouldIncludeReportingSecret } from './reporting-utils'
@@ -394,6 +398,131 @@ function hasOptionalProperty<T, K extends PropertyKey>(obj: T, key: K): obj is W
 	return typeof obj === 'object' && obj !== null && key in obj && (obj as any)[key] !== null
 }
 
+const formatNativeFlowButton = (button: NativeButton): proto.Message.InteractiveMessage.NativeFlowMessage.INativeFlowButton => {
+	switch (button.type) {
+		case 'url':
+			return {
+				name: 'cta_url',
+				buttonParamsJson: JSON.stringify({
+					display_text: button.text,
+					url: button.url,
+					merchant_url: button.merchantUrl || button.url
+				})
+			}
+		case 'copy':
+			return {
+				name: 'cta_copy',
+				buttonParamsJson: JSON.stringify({
+					display_text: button.text,
+					copy_code: button.copyText
+				})
+			}
+		case 'call':
+			return {
+				name: 'cta_call',
+				buttonParamsJson: JSON.stringify({
+					display_text: button.text,
+					phone_number: button.phoneNumber
+				})
+			}
+		case 'reply':
+			return {
+				name: 'quick_reply',
+				buttonParamsJson: JSON.stringify({
+					display_text: button.text,
+					id: button.id
+				})
+			}
+	}
+}
+
+const generateCarouselMessage = async (
+	carousel: NativeCarouselMessageOptions,
+	options: MessageContentGenerationOptions
+): Promise<WAMessageContent> => {
+	const { cards, title, text, footer } = carousel
+	if (!cards || cards.length < 2) {
+		throw new Boom('carousel requires at least 2 cards', { statusCode: 400 })
+	}
+
+	if (cards.length > 10) {
+		throw new Boom('carousel cannot have more than 10 cards', { statusCode: 400 })
+	}
+
+	const recoverImageMetadata = async (
+		imageMessage: proto.Message.IImageMessage | null | undefined,
+		image: WAMediaUpload,
+		cardTitle?: string
+	) => {
+		if (!imageMessage || (imageMessage.jpegThumbnail && imageMessage.width && imageMessage.height)) {
+			return
+		}
+
+		try {
+			const { stream } = await getStream(image, options.options)
+			const thumb = await extractImageThumb(stream)
+			imageMessage.jpegThumbnail ||= thumb.buffer
+			imageMessage.width ||= thumb.original.width
+			imageMessage.height ||= thumb.original.height
+		} catch (error) {
+			options.logger?.warn({ cardTitle, error }, '[CAROUSEL] failed to recover image metadata')
+		}
+	}
+
+	const carouselCards = await Promise.all(
+		cards.map(async (card, index) => {
+			if (!card.buttons?.length) {
+				throw new Boom(`carousel card ${index + 1} requires at least 1 button`, { statusCode: 400 })
+			}
+
+			if (card.image && card.video) {
+				throw new Boom(`carousel card ${index + 1} cannot have both image and video`, { statusCode: 400 })
+			}
+
+			const hasMedia = !!(card.image || card.video)
+			const header: proto.Message.InteractiveMessage.IHeader = {
+				title: card.title || '',
+				subtitle: card.footer || '',
+				hasMediaAttachment: hasMedia
+			}
+
+			if (card.image) {
+				const { imageMessage } = await prepareWAMessageMedia({ image: card.image }, options)
+				await recoverImageMetadata(imageMessage, card.image, card.title)
+				if (imageMessage && (!imageMessage.width || !imageMessage.height)) {
+					imageMessage.width ||= 500
+					imageMessage.height ||= 500
+				}
+				header.imageMessage = imageMessage
+			} else if (card.video) {
+				const { videoMessage } = await prepareWAMessageMedia({ video: card.video }, options)
+				header.videoMessage = videoMessage
+			}
+
+			return {
+				header,
+				body: { text: card.body || '' },
+				footer: card.footer ? { text: card.footer } : undefined,
+				nativeFlowMessage: {
+					buttons: card.buttons.map(formatNativeFlowButton)
+				}
+			}
+		})
+	)
+
+	return {
+		interactiveMessage: {
+			carouselMessage: {
+				cards: carouselCards,
+				messageVersion: 1
+			},
+			header: { title: title || ' ', hasMediaAttachment: false },
+			body: { text: text || '' },
+			footer: footer ? { text: footer } : undefined
+		}
+	}
+}
+
 export const generateWAMessageContent = async (
 	message: AnyMessageContent,
 	options: MessageContentGenerationOptions
@@ -422,7 +551,17 @@ export const generateWAMessageContent = async (
 		const nextHeader = { ...header, ...prepared }
 		return { ...card, header: nextHeader }
 	}
-	if (hasNonNullishProperty(message, 'text')) {
+	if (hasNonNullishProperty(message, 'nativeCarousel')) {
+		m = await generateCarouselMessage(
+			{
+				...message.nativeCarousel,
+				title: message.nativeCarousel.title || message.title,
+				text: message.nativeCarousel.text || message.text,
+				footer: message.nativeCarousel.footer || message.footer
+			},
+			options
+		)
+	} else if (hasNonNullishProperty(message, 'text')) {
 		const extContent = { text: message.text } as WATextMessage
 
 		let urlInfo = message.linkPreview
@@ -716,10 +855,12 @@ export const generateWAMessageContent = async (
 	const hasSections = 'sections' in message && !!message.sections
 	const hasProductListInfo = 'productListInfo' in message && !!message.productListInfo
 	if (hasSections || hasProductListInfo) {
-	// Sections without productListInfo are regular single-select lists.
-	const listType = hasProductListInfo
-		? proto.Message.ListMessage.ListType.PRODUCT_LIST
-		: proto.Message.ListMessage.ListType.SINGLE_SELECT
+		const requestedListType = 'listType' in message ? message.listType : undefined
+		const listType =
+			requestedListType ??
+			(hasSections || hasProductListInfo
+				? proto.Message.ListMessage.ListType.PRODUCT_LIST
+				: proto.Message.ListMessage.ListType.SINGLE_SELECT)
 		const listMessage: proto.Message.IListMessage = {
 			sections: hasSections ? message.sections : undefined,
 			productListInfo: hasProductListInfo ? message.productListInfo : undefined,

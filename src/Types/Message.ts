@@ -201,6 +201,28 @@ export type InteractiveMessageContent = {
 	interactiveMessage: proto.Message.IInteractiveMessage
 }
 
+export type NativeButton =
+	| { type: 'url'; text: string; url: string; merchantUrl?: string }
+	| { type: 'copy'; text: string; copyText: string }
+	| { type: 'reply'; text: string; id: string }
+	| { type: 'call'; text: string; phoneNumber: string }
+
+export type NativeCarouselCard = {
+	title: string
+	body?: string
+	footer?: string
+	image?: WAMediaUpload
+	video?: WAMediaUpload
+	buttons: NativeButton[]
+}
+
+export type NativeCarouselMessageOptions = {
+	cards: NativeCarouselCard[]
+	title?: string
+	text?: string
+	footer?: string
+}
+
 export type AnyMediaMessageContent = (
 	| ({
 			image: WAMediaUpload
@@ -318,6 +340,12 @@ export type AnyRegularMessageContent = (
 			product: WASendableProduct
 			businessOwnerJid?: string
 			body?: string
+			footer?: string
+	  }
+	| {
+			nativeCarousel: NativeCarouselMessageOptions
+			text?: string
+			title?: string
 			footer?: string
 	  }
 	| InteractiveMessageContent
