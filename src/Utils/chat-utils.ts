@@ -954,6 +954,7 @@ export const processSyncAction = (
 					action.lidContactAction.firstName ||
 					action.lidContactAction.username ||
 					undefined,
+				username: action.lidContactAction.username || undefined,
 				lid: id!,
 				phoneNumber: undefined
 			}
