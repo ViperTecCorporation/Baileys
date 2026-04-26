@@ -909,3 +909,108 @@ else if content.buttonsMessage:
   kind = buttons_message
   parse buttons
 ```
+
+# Nota futura: view-once indisponivel
+
+Contexto observado:
+
+- O PR WhiskeySockets/Baileys #2435 ja esta aplicado neste branch.
+- Quando o WhatsApp entrega o stanza real `enc` com a midia, o codigo consegue decodificar `viewOnceMessage.message.imageMessage/videoMessage/audioMessage` e marca `key.isViewOnce = true`.
+- Quando o WhatsApp entrega apenas o placeholder `<unavailable type="view_once" />` ou fanout equivalente, nao existe `mediaKey`, `directPath`, `url` ou payload criptografado para baixar/decriptar.
+
+Texto atual gerado pelo proprio Baileys deste branch:
+
+```txt
+Mensagem de visualizacao unica indisponivel aqui, confira no aparelho.
+```
+
+Esse texto nao e a midia real. Ele vem do fallback em `src/Socket/messages-recv.ts` quando o stub contem:
+
+```json
+{
+  "messageStubParameters": ["view_once_unavailable"]
+}
+```
+
+## Limite tecnico
+
+Nao ha como decodificar a midia se o servidor nao entregou o conteudo real. Para funcionar de verdade, uma destas condicoes precisa acontecer:
+
+1. O WhatsApp entrega um stanza `enc` com a midia real.
+2. O aparelho principal responde um `placeholder resend` com o conteudo real.
+
+Se nenhum dos dois acontecer, o melhor comportamento para integracao e emitir um evento estruturado, nao uma mensagem de texto comum.
+
+## Plano experimental para retomar
+
+Objetivo: trocar o fallback textual por um fluxo estruturado e, opcionalmente, tentar recuperar a midia.
+
+Proposta:
+
+1. Adicionar config para controlar o comportamento:
+
+```ts
+emitViewOnceUnavailableEvent?: boolean
+attemptViewOncePlaceholderResend?: boolean
+sendViewOnceUnavailableText?: boolean
+```
+
+2. Quando receber `view_once_unavailable`, emitir evento/atualizacao estruturada:
+
+```json
+{
+  "type": "view_once_unavailable",
+  "key": {
+    "id": "MSG_ID",
+    "remoteJid": "5511999999999@s.whatsapp.net",
+    "fromMe": true
+  },
+  "reason": "server_delivered_unavailable_placeholder",
+  "canRetryPlaceholderResend": true
+}
+```
+
+3. Testar tentativa de `requestPlaceholderResend` mesmo em cenarios hoje pulados, especialmente:
+
+```txt
+view_once_unavailable_fanout
+```
+
+4. Logar sinais decisivos:
+
+```txt
+requested placeholder resend for unavailable message
+skipping placeholder resend for excluded unavailable type
+failed to request placeholder resend for unavailable message
+```
+
+5. Se o aparelho responder com conteudo real, publicar a midia view-once normalmente com:
+
+```json
+{
+  "key": {
+    "isViewOnce": true
+  },
+  "message": {
+    "viewOnceMessage": {
+      "message": {
+        "imageMessage": {}
+      }
+    }
+  }
+}
+```
+
+6. Se nao responder, publicar apenas o evento estruturado `view_once_unavailable`.
+
+## Cuidado
+
+Nao tratar a frase atual como mensagem normal de usuario. Ela e fallback local, nao conteudo enviado pelo contato.
+
+Tambem nao assumir que retry sempre funcionara. View-once depende do servidor/aparelho principal e pode variar entre:
+
+- conta normal
+- WhatsApp Business
+- dispositivo companion
+- grupo
+- conversa 1:1
