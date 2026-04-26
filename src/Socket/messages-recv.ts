@@ -124,9 +124,6 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			useClones: false
 		})
 
-	const viewOnceUnavailableText =
-		'Mensagem de visualização única indisponível aqui, confira no aparelho.'
-
 	const placeholderResendCache =
 		config.placeholderResendCache ||
 		new NodeCache({
@@ -1489,16 +1486,6 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 						await sendMessageAck(node)
 						logger.debug({ key: msg.key }, 'processed newsletter message without receipts')
 					}
-				}
-
-				const isViewOnceUnavailable =
-					msg.key.fromMe &&
-					!isJidStatusBroadcast(msg.key.remoteJid!) &&
-					!isJidGroup(msg.key.remoteJid!) &&
-					!isJidNewsletter(msg.key.remoteJid!) &&
-					msg.messageStubParameters?.includes('view_once_unavailable')
-				if (isViewOnceUnavailable) {
-					await sendMessage(msg.key.remoteJid!, { text: viewOnceUnavailableText })
 				}
 
 				cleanMessage(msg, authState.creds.me!.id, authState.creds.me!.lid!)

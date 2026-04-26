@@ -918,13 +918,13 @@ Contexto observado:
 - Quando o WhatsApp entrega o stanza real `enc` com a midia, o codigo consegue decodificar `viewOnceMessage.message.imageMessage/videoMessage/audioMessage` e marca `key.isViewOnce = true`.
 - Quando o WhatsApp entrega apenas o placeholder `<unavailable type="view_once" />` ou fanout equivalente, nao existe `mediaKey`, `directPath`, `url` ou payload criptografado para baixar/decriptar.
 
-Texto atual gerado pelo proprio Baileys deste branch:
+Texto que era gerado pelo proprio Baileys deste branch e foi removido para nao enviar mensagem ao contato durante historico/importacao:
 
 ```txt
 Mensagem de visualizacao unica indisponivel aqui, confira no aparelho.
 ```
 
-Esse texto nao e a midia real. Ele vem do fallback em `src/Socket/messages-recv.ts` quando o stub contem:
+Esse texto nao e a midia real. Ele vinha do fallback em `src/Socket/messages-recv.ts` quando o stub contem:
 
 ```json
 {
@@ -943,7 +943,7 @@ Se nenhum dos dois acontecer, o melhor comportamento para integracao e emitir um
 
 ## Plano experimental para retomar
 
-Objetivo: trocar o fallback textual por um fluxo estruturado e, opcionalmente, tentar recuperar a midia.
+Objetivo: manter o fallback textual removido, criar um fluxo estruturado e, opcionalmente, tentar recuperar a midia.
 
 Proposta:
 
@@ -952,7 +952,6 @@ Proposta:
 ```ts
 emitViewOnceUnavailableEvent?: boolean
 attemptViewOncePlaceholderResend?: boolean
-sendViewOnceUnavailableText?: boolean
 ```
 
 2. Quando receber `view_once_unavailable`, emitir evento/atualizacao estruturada:
@@ -1005,7 +1004,7 @@ failed to request placeholder resend for unavailable message
 
 ## Cuidado
 
-Nao tratar a frase atual como mensagem normal de usuario. Ela e fallback local, nao conteudo enviado pelo contato.
+Nao reintroduzir envio automatico da frase acima. Ela era fallback local, nao conteudo enviado pelo contato, e polui o chat principalmente durante importacao de historico.
 
 Tambem nao assumir que retry sempre funcionara. View-once depende do servidor/aparelho principal e pode variar entre:
 
