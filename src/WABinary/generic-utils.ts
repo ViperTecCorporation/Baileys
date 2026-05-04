@@ -1,4 +1,5 @@
 import { Boom } from '@hapi/boom'
+import { randomBytes } from 'crypto'
 import { proto } from '../../WAProto/index.js'
 import { type BinaryNode } from './types'
 
@@ -138,4 +139,94 @@ export function binaryNodeToString(node: BinaryNode | BinaryNode['content'], i =
 	const content: string = children ? `>\n${children}\n${tabs(i)}</${node.tag}>` : '/>'
 
 	return tag + content
+}
+
+const INTERACTIVE_FLOW_NAMES = new Set([
+	'mpm',
+	'cta_catalog',
+	'send_location',
+	'call_permission_request',
+	'wa_payment_transaction_details',
+	'automated_greeting_message_view_catalog'
+])
+
+const decisionSourceContent: BinaryNode[] = [{ tag: 'decision_source', attrs: { value: 'df' } }]
+
+const mixedNativeFlowNode: BinaryNode = {
+	tag: 'interactive',
+	attrs: { type: 'native_flow', v: '1' },
+	content: [{ tag: 'native_flow', attrs: { v: '9', name: 'mixed' } }]
+}
+
+const qualityControlNode = (): BinaryNode => ({
+	tag: 'quality_control',
+	attrs: {
+		decision_id: randomBytes(20).toString('hex'),
+		source_type: 'third_party'
+	},
+	content: decisionSourceContent
+})
+
+export const shouldIncludeBizBinaryNode = (message: proto.IMessage) => {
+	const innerMessage = message.documentWithCaptionMessage?.message || message
+	const interactiveMessage = innerMessage.interactiveMessage
+
+	return !!(
+		innerMessage.buttonsMessage ||
+		innerMessage.listMessage ||
+		innerMessage.templateMessage ||
+		interactiveMessage?.nativeFlowMessage ||
+		interactiveMessage?.carouselMessage
+	)
+}
+
+export const getBizBinaryNode = (message: proto.IMessage): BinaryNode => {
+	const innerMessage = message.documentWithCaptionMessage?.message || message
+	const flowMessage = innerMessage.interactiveMessage?.nativeFlowMessage
+	const firstButtonName = flowMessage?.buttons?.[0]?.name
+	const qualityContent = qualityControlNode()
+
+	if (firstButtonName === 'review_and_pay' || firstButtonName === 'payment_info') {
+		return {
+			tag: 'biz',
+			attrs: {
+				native_flow_name: firstButtonName === 'review_and_pay' ? 'order_details' : firstButtonName
+			},
+			content: [qualityContent]
+		}
+	}
+
+	if (firstButtonName && INTERACTIVE_FLOW_NAMES.has(firstButtonName)) {
+		return {
+			tag: 'biz',
+			attrs: {},
+			content: [
+				{
+					tag: 'interactive',
+					attrs: { type: 'native_flow', v: '1' },
+					content: [{ tag: 'native_flow', attrs: { v: '2', name: firstButtonName } }]
+				},
+				qualityContent
+			]
+		}
+	}
+
+	if (innerMessage.listMessage) {
+		const listType =
+			innerMessage.listMessage.listType === proto.Message.ListMessage.ListType.SINGLE_SELECT
+				? 'single_select'
+				: 'product_list'
+
+		return {
+			tag: 'biz',
+			attrs: {},
+			content: [{ tag: 'list', attrs: { type: listType, v: '2' } }, qualityContent]
+		}
+	}
+
+	return {
+		tag: 'biz',
+		attrs: {},
+		content: [mixedNativeFlowNode, qualityContent]
+	}
 }

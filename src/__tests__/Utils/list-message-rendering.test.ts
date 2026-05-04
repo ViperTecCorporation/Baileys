@@ -1,5 +1,6 @@
 import { proto } from '../../../WAProto'
 import { generateWAMessageContent } from '../../Utils/messages'
+import { getBizBinaryNode, shouldIncludeBizBinaryNode } from '../../WABinary'
 
 describe('list message rendering metadata', () => {
 	it('defaults section lists to PRODUCT_LIST so the send path emits product_list biz metadata', async () => {
@@ -67,5 +68,53 @@ describe('list message rendering metadata', () => {
 		expect(message.interactiveMessage?.carouselMessage?.cards?.[0]?.nativeFlowMessage?.buttons?.[0]?.name).toBe(
 			'quick_reply'
 		)
+	})
+
+	it('adds quality control metadata to list biz nodes', () => {
+		const message = {
+			listMessage: {
+				listType: proto.Message.ListMessage.ListType.PRODUCT_LIST
+			}
+		}
+
+		expect(shouldIncludeBizBinaryNode(message)).toBe(true)
+		expect(getBizBinaryNode(message)).toMatchObject({
+			tag: 'biz',
+			content: [
+				{ tag: 'list', attrs: { type: 'product_list', v: '2' } },
+				{
+					tag: 'quality_control',
+					attrs: { source_type: 'third_party' },
+					content: [{ tag: 'decision_source', attrs: { value: 'df' } }]
+				}
+			]
+		})
+	})
+
+	it('adds quality control metadata to native flow biz nodes', () => {
+		const message = {
+			interactiveMessage: {
+				nativeFlowMessage: {
+					buttons: [{ name: 'quick_reply' }]
+				}
+			}
+		}
+
+		expect(shouldIncludeBizBinaryNode(message)).toBe(true)
+		expect(getBizBinaryNode(message)).toMatchObject({
+			tag: 'biz',
+			content: [
+				{
+					tag: 'interactive',
+					attrs: { type: 'native_flow', v: '1' },
+					content: [{ tag: 'native_flow', attrs: { v: '9', name: 'mixed' } }]
+				},
+				{
+					tag: 'quality_control',
+					attrs: { source_type: 'third_party' },
+					content: [{ tag: 'decision_source', attrs: { value: 'df' } }]
+				}
+			]
+		})
 	})
 })

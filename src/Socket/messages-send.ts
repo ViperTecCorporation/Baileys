@@ -50,6 +50,7 @@ import {
 	type BinaryNode,
 	type BinaryNodeAttributes,
 	type FullJid,
+	getBizBinaryNode,
 	getBinaryNodeChild,
 	getBinaryNodeChildren,
 	isHostedLidUser,
@@ -60,6 +61,7 @@ import {
 	jidDecode,
 	jidEncode,
 	jidNormalizedUser,
+	shouldIncludeBizBinaryNode,
 	type JidWithDevice,
 	S_WHATSAPP_NET
 } from '../WABinary'
@@ -610,49 +612,6 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		}
 
 		return { nodes, shouldIncludeDeviceIdentity }
-	}
-
-	const createButtonNode = (message: proto.IMessage): BinaryNode[] | null => {
-		if (message.listMessage) {
-			const listType =
-				message.listMessage.listType === proto.Message.ListMessage.ListType.PRODUCT_LIST
-					? 'product_list'
-					: 'single_select'
-			return [
-				{
-					tag: 'list',
-					attrs: { type: listType, v: '2' }
-				}
-			]
-		}
-
-		if (message.interactiveMessage?.carouselMessage) {
-			const decisionId = randomBytes(20).toString('hex')
-			return [
-				{
-					tag: 'interactive',
-					attrs: { type: 'native_flow', v: '1' },
-					content: [{ tag: 'native_flow', attrs: { v: '9', name: 'mixed' } }]
-				},
-				{
-					tag: 'quality_control',
-					attrs: { decision_id: decisionId },
-					content: [{ tag: 'decision_source', attrs: { value: 'df' } }]
-				}
-			]
-		}
-
-		if (message.buttonsMessage || message.interactiveMessage?.nativeFlowMessage) {
-			return [
-				{
-					tag: 'interactive',
-					attrs: { type: 'native_flow', v: '1' },
-					content: [{ tag: 'native_flow', attrs: { v: '9', name: 'mixed' } }]
-				}
-			]
-		}
-
-		return null
 	}
 
 	const convertNativeFlowListToListMessage = (message: proto.IMessage) => {
@@ -1250,13 +1209,8 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			}
 
 			const innerMessage = message.documentWithCaptionMessage?.message || message
-			const buttonContent = createButtonNode(innerMessage)
-			if (buttonContent) {
-				;(stanza.content as BinaryNode[]).push({
-					tag: 'biz',
-					attrs: {},
-					content: buttonContent
-				})
+			if (shouldIncludeBizBinaryNode(innerMessage)) {
+				;(stanza.content as BinaryNode[]).push(getBizBinaryNode(innerMessage))
 				logger.debug({ jid, convertedNativeFlowList }, 'adding biz node for buttons message')
 			}
 
