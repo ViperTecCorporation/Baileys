@@ -65,7 +65,7 @@ describe('list message rendering metadata', () => {
 		expect(message.interactiveMessage?.carouselMessage?.cards).toHaveLength(2)
 		expect(message.interactiveMessage?.carouselMessage?.messageVersion).toBe(1)
 		expect(message.interactiveMessage?.carouselMessage?.carouselCardType).toBe(
-			proto.Message.InteractiveMessage.CarouselMessage.CarouselCardType.HSCROLL_CARDS
+			proto.Message.InteractiveMessage.CarouselMessage.CarouselCardType.UNKNOWN
 		)
 		expect(message.viewOnceMessage).toBeFalsy()
 		expect(message.interactiveMessage?.carouselMessage?.cards?.[0]?.nativeFlowMessage?.messageVersion).toBe(1)
@@ -165,5 +165,28 @@ describe('list message rendering metadata', () => {
 				}
 			]
 		})
+	})
+
+	it('preserves buttonsMessage native flow type for single_select lists', async () => {
+		const message = await generateWAMessageContent(
+			{
+				text: 'Choose an option',
+				buttons: [
+					{
+						nativeFlowInfo: {
+							name: 'single_select',
+							paramsJson: JSON.stringify({
+								title: 'Open',
+								sections: [{ title: 'Options', rows: [{ id: 'first', title: 'First' }] }]
+							})
+						}
+					}
+				]
+			},
+			{} as never
+		)
+
+		expect(message.buttonsMessage?.buttons?.[0]?.type).toBe(proto.Message.ButtonsMessage.Button.Type.NATIVE_FLOW)
+		expect(message.buttonsMessage?.buttons?.[0]?.nativeFlowInfo?.name).toBe('single_select')
 	})
 })

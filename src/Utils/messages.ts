@@ -516,7 +516,7 @@ const generateCarouselMessage = async (
 			carouselMessage: {
 				cards: carouselCards,
 				messageVersion: 1,
-				carouselCardType: proto.Message.InteractiveMessage.CarouselMessage.CarouselCardType.HSCROLL_CARDS
+				carouselCardType: proto.Message.InteractiveMessage.CarouselMessage.CarouselCardType.UNKNOWN
 			},
 			header: { title: title || ' ', hasMediaAttachment: false },
 			body: { text: text || '' },
@@ -704,7 +704,7 @@ export const generateWAMessageContent = async (
 				messageVersion: interactive.carouselMessage.messageVersion ?? 1,
 				carouselCardType:
 					interactive.carouselMessage.carouselCardType ??
-					proto.Message.InteractiveMessage.CarouselMessage.CarouselCardType.HSCROLL_CARDS
+					proto.Message.InteractiveMessage.CarouselMessage.CarouselCardType.UNKNOWN
 			}
 		}
 	}
@@ -810,10 +810,33 @@ export const generateWAMessageContent = async (
 
 	if ('buttons' in message && !!message.buttons) {
 		const buttonsMessage: proto.Message.IButtonsMessage = {
-			buttons: message.buttons.map(b => ({
-				...b,
-				type: proto.Message.ButtonsMessage.Button.Type.RESPONSE
-			}))
+			buttons: message.buttons.map(b => {
+				if ((b as any).nativeFlowInfo) {
+					return {
+						...b,
+						type: proto.Message.ButtonsMessage.Button.Type.NATIVE_FLOW
+					}
+				}
+
+				if ((b as any).sections) {
+					const buttonText = (b as any).text || (b as any).buttonText?.displayText || (b as any).buttonText || (message as any).buttonText
+					return {
+						nativeFlowInfo: {
+							name: 'single_select',
+							paramsJson: JSON.stringify({
+								title: buttonText || 'Selecionar',
+								sections: (b as any).sections
+							})
+						},
+						type: proto.Message.ButtonsMessage.Button.Type.NATIVE_FLOW
+					}
+				}
+
+				return {
+					...b,
+					type: b.type || proto.Message.ButtonsMessage.Button.Type.RESPONSE
+				}
+			})
 		}
 
 		if ('text' in message) {
