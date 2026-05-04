@@ -16,6 +16,7 @@ import type {
 import {
 	aggregateMessageKeysNotFromMe,
 	assertMediaContent,
+	assertMeId,
 	bindWaitForEvent,
 	decryptMediaRetryData,
 	encodeNewsletterMessage,
@@ -677,7 +678,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			statusJidList
 		}: MessageRelayOptions
 	) => {
-		const meId = authState.creds.me!.id
+		const meId = assertMeId(authState.creds)
 		const meLid = authState.creds.me?.lid
 		const isRetryResend = Boolean(participant?.jid)
 		let shouldIncludeDeviceIdentity = isRetryResend
