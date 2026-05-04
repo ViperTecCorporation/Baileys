@@ -504,7 +504,8 @@ const generateCarouselMessage = async (
 				body: { text: card.body || '' },
 				footer: card.footer ? { text: card.footer } : undefined,
 				nativeFlowMessage: {
-					buttons: card.buttons.map(formatNativeFlowButton)
+					buttons: card.buttons.map(formatNativeFlowButton),
+					messageVersion: 1
 				}
 			}
 		})
@@ -514,7 +515,8 @@ const generateCarouselMessage = async (
 		interactiveMessage: {
 			carouselMessage: {
 				cards: carouselCards,
-				messageVersion: 1
+				messageVersion: 1,
+				carouselCardType: proto.Message.InteractiveMessage.CarouselMessage.CarouselCardType.HSCROLL_CARDS
 			},
 			header: { title: title || ' ', hasMediaAttachment: false },
 			body: { text: text || '' },
@@ -693,7 +695,16 @@ export const generateWAMessageContent = async (
 			...interactive,
 			carouselMessage: {
 				...interactive.carouselMessage,
-				cards
+				cards: cards.map(card => ({
+					...card,
+					nativeFlowMessage: card.nativeFlowMessage
+						? { ...card.nativeFlowMessage, messageVersion: card.nativeFlowMessage.messageVersion ?? 1 }
+						: card.nativeFlowMessage
+				})),
+				messageVersion: interactive.carouselMessage.messageVersion ?? 1,
+				carouselCardType:
+					interactive.carouselMessage.carouselCardType ??
+					proto.Message.InteractiveMessage.CarouselMessage.CarouselCardType.HSCROLL_CARDS
 			}
 		}
 	}

@@ -64,7 +64,11 @@ describe('list message rendering metadata', () => {
 
 		expect(message.interactiveMessage?.carouselMessage?.cards).toHaveLength(2)
 		expect(message.interactiveMessage?.carouselMessage?.messageVersion).toBe(1)
+		expect(message.interactiveMessage?.carouselMessage?.carouselCardType).toBe(
+			proto.Message.InteractiveMessage.CarouselMessage.CarouselCardType.HSCROLL_CARDS
+		)
 		expect(message.viewOnceMessage).toBeFalsy()
+		expect(message.interactiveMessage?.carouselMessage?.cards?.[0]?.nativeFlowMessage?.messageVersion).toBe(1)
 		expect(message.interactiveMessage?.carouselMessage?.cards?.[0]?.nativeFlowMessage?.buttons?.[0]?.name).toBe(
 			'quick_reply'
 		)
