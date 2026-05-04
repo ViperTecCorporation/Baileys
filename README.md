@@ -375,8 +375,47 @@ connectToWhatsApp()
 
 ### Decrypt Poll Votes
 
-- By default poll votes are encrypted and handled in `messages.update`
-- That's a simple example
+- By default poll votes are encrypted. Use `decryptPollVoteWithLidFallback` in `messages.upsert` when you need to handle both Phone Number (PN) and Local Identifier (LID) JIDs:
+```ts
+import { decryptPollVoteWithLidFallback } from '@whiskeysockets/baileys'
+
+sock.ev.on('messages.upsert', async ({ messages }) => {
+    for(const msg of messages) {
+        const pollUpdate = msg.message?.pollUpdateMessage
+        if(pollUpdate) {
+            const pollCreation = await getMessage(pollUpdate.pollCreationMessageKey)
+            const pollEncKey = pollCreation?.messageContextInfo?.messageSecret
+            if(pollEncKey) {
+                const vote = decryptPollVoteWithLidFallback(
+                    pollUpdate.vote!,
+                    {
+                        pollEncKey,
+                        pollCreationMsgKey: pollUpdate.pollCreationMessageKey!,
+                        voteMsgKey: msg.key,
+                        meId: sock.user!.id,
+                        meLid: sock.user!.lid
+                    }
+                )
+
+                if(vote) {
+                    sock.ev.emit('messages.update', [{
+                        key: pollUpdate.pollCreationMessageKey!,
+                        update: {
+                            pollUpdates: [{
+                                pollUpdateMessageKey: msg.key,
+                                vote,
+                                senderTimestampMs: pollUpdate.senderTimestampMs!
+                            }]
+                        }
+                    }])
+                }
+            }
+        }
+    }
+})
+```
+
+- After emitting `messages.update`, you can aggregate the decrypted votes:
 ```ts
 sock.ev.on('messages.update', event => {
     for(const { key, update } of event) {

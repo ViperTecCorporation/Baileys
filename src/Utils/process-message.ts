@@ -202,6 +202,74 @@ export function decryptPollVote(
 }
 
 /**
+ * Decrypt a poll vote with automatic LID/PN JID fallback handling.
+ *
+ * WhatsApp can mix Phone Number (PN) and Local Identifier (LID) JIDs in the
+ * same poll flow. This utility tries creator/voter JID combinations until one
+ * matches the encryption context.
+ */
+export function decryptPollVoteWithLidFallback(
+	encryptedVote: proto.Message.IPollEncValue,
+	opts: {
+		pollEncKey: Uint8Array
+		pollCreationMsgKey: WAMessageKey
+		voteMsgKey: WAMessageKey
+		meId: string
+		meLid?: string
+	}
+): proto.Message.PollVoteMessage | undefined {
+	const { pollEncKey, pollCreationMsgKey, voteMsgKey, meId, meLid } = opts
+
+	const meIdNormalised = jidNormalizedUser(meId)
+	const meLidNormalised = meLid ? jidNormalizedUser(meLid) : undefined
+
+	const creatorPnJid = getKeyAuthor(pollCreationMsgKey, meIdNormalised)
+	const creatorLidJid =
+		pollCreationMsgKey.fromMe && meLidNormalised
+			? meLidNormalised
+			: pollCreationMsgKey.participant && isLidUser(pollCreationMsgKey.participant)
+				? jidNormalizedUser(pollCreationMsgKey.participant)
+				: (pollCreationMsgKey as any).participantAlt && isLidUser((pollCreationMsgKey as any).participantAlt)
+					? jidNormalizedUser((pollCreationMsgKey as any).participantAlt)
+					: undefined
+	const creatorCandidates = [creatorPnJid]
+	if (creatorLidJid && creatorLidJid !== creatorPnJid) {
+		creatorCandidates.push(creatorLidJid)
+	}
+
+	const voterPnJid = getKeyAuthor(voteMsgKey, meIdNormalised)
+	const voterLidJid =
+		voteMsgKey.fromMe && meLidNormalised
+			? meLidNormalised
+			: voteMsgKey.participant && isLidUser(voteMsgKey.participant)
+				? jidNormalizedUser(voteMsgKey.participant)
+				: (voteMsgKey as any).participantAlt && isLidUser((voteMsgKey as any).participantAlt)
+					? jidNormalizedUser((voteMsgKey as any).participantAlt)
+					: undefined
+	const voterCandidates = [voterPnJid]
+	if (voterLidJid && voterLidJid !== voterPnJid) {
+		voterCandidates.push(voterLidJid)
+	}
+
+	for (const pollCreatorJid of creatorCandidates) {
+		for (const voterJid of voterCandidates) {
+			try {
+				return decryptPollVote(encryptedVote, {
+					pollEncKey,
+					pollCreatorJid,
+					pollMsgId: pollCreationMsgKey.id!,
+					voterJid
+				})
+			} catch {
+				// Try the next PN/LID combination.
+			}
+		}
+	}
+
+	return undefined
+}
+
+/**
  * Decrypt an event response
  * @param response encrypted event response
  * @param ctx additional info about the event required for decryption
