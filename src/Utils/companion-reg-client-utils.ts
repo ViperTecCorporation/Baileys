@@ -41,8 +41,7 @@ export const buildPairingQRData = (
 	advB64: string,
 	browser: WABrowserDescription
 ): string => {
-	return [
-		'https://wa.me/settings/linked_devices#',
+	return 'https://wa.me/settings/linked_devices#'+ [
 		ref,
 		noiseKeyB64,
 		identityKeyB64,
