@@ -117,4 +117,49 @@ describe('list message rendering metadata', () => {
 			]
 		})
 	})
+
+	it('keeps native flow single_select lists as interactive messages', async () => {
+		const message = await generateWAMessageContent(
+			{
+				interactiveMessage: {
+					body: { text: 'Choose an option' },
+					nativeFlowMessage: {
+						buttons: [
+							{
+								name: 'single_select',
+								buttonParamsJson: JSON.stringify({
+									title: 'Open',
+									sections: [
+										{
+											title: 'Options',
+											rows: [{ id: 'first', rowId: 'first', title: 'First' }]
+										}
+									]
+								})
+							}
+						],
+						messageVersion: 1
+					}
+				}
+			},
+			{} as never
+		)
+
+		expect(message.interactiveMessage?.nativeFlowMessage?.buttons?.[0]?.name).toBe('single_select')
+		expect(message.listMessage).toBeFalsy()
+		expect(getBizBinaryNode(message)).toMatchObject({
+			tag: 'biz',
+			content: [
+				{
+					tag: 'interactive',
+					attrs: { type: 'native_flow', v: '1' },
+					content: [{ tag: 'native_flow', attrs: { v: '9', name: 'mixed' } }]
+				},
+				{
+					tag: 'quality_control',
+					attrs: { source_type: 'third_party' }
+				}
+			]
+		})
+	})
 })

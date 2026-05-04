@@ -615,56 +615,6 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		return { nodes, shouldIncludeDeviceIdentity }
 	}
 
-	const convertNativeFlowListToListMessage = (message: proto.IMessage) => {
-		const container =
-			message.viewOnceMessage?.message || message.viewOnceMessageV2?.message || message.viewOnceMessageV2Extension?.message || message
-		const interactive = container.interactiveMessage
-		const singleSelectButton = interactive?.nativeFlowMessage?.buttons?.find(button => button?.name === 'single_select')
-		if (!singleSelectButton?.buttonParamsJson) {
-			return false
-		}
-
-		let params: { title?: string; sections?: any[] }
-		try {
-			params = JSON.parse(singleSelectButton.buttonParamsJson)
-		} catch {
-			return false
-		}
-
-		const sections = params.sections
-			?.map(section => ({
-				title: section.title,
-				rows: section.rows?.map((row: any) => ({
-					rowId: row.rowId || row.id,
-					title: row.title,
-					description: row.description || ''
-				}))
-			}))
-			.filter(section => section.rows?.length)
-
-		if (!sections?.length) {
-			return false
-		}
-
-		const listMessage = proto.Message.ListMessage.fromObject({
-			title: interactive?.header?.title || '',
-			description: interactive?.body?.text || '',
-			buttonText: params.title || 'Menu',
-			footerText: interactive?.footer?.text || '',
-			listType: proto.Message.ListMessage.ListType.PRODUCT_LIST,
-			sections
-		})
-
-		message.listMessage = listMessage
-		message.messageContextInfo ||= container.messageContextInfo
-		delete message.viewOnceMessage
-		delete message.viewOnceMessageV2
-		delete message.viewOnceMessageV2Extension
-		delete message.interactiveMessage
-
-		return true
-	}
-
 	const relayMessage = async (
 		jid: string,
 		message: proto.IMessage,
@@ -695,7 +645,6 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		msgId = msgId || generateMessageIDV2(meId)
 		useUserDevicesCache = useUserDevicesCache !== false
 		useCachedGroupMetadata = useCachedGroupMetadata !== false && !isStatus
-		const convertedNativeFlowList = convertNativeFlowListToListMessage(message)
 		const shouldForceCarouselDeviceIdentity = !!(
 			message.interactiveMessage?.carouselMessage ||
 			message.documentWithCaptionMessage?.message?.interactiveMessage?.carouselMessage
@@ -1212,7 +1161,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			const innerMessage = message.documentWithCaptionMessage?.message || message
 			if (shouldIncludeBizBinaryNode(innerMessage)) {
 				;(stanza.content as BinaryNode[]).push(getBizBinaryNode(innerMessage))
-				logger.debug({ jid, convertedNativeFlowList }, 'adding biz node for buttons message')
+				logger.debug({ jid }, 'adding biz node for buttons message')
 			}
 
 			if (innerMessage.buttonsMessage || innerMessage.listMessage || innerMessage.interactiveMessage) {
