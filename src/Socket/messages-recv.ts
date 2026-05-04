@@ -276,12 +276,16 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				for (const update of updates) {
 					const lid = update?.jid
 					const addedProfiles = Array.isArray(update?.added_profiles) ? update.added_profiles : []
+					const mappings = []
 					for (const profile of addedProfiles) {
 						const pn = typeof profile === 'string' ? profile : (profile?.pn ?? profile?.jid ?? null)
 						if (lid && pn) {
-							ev.emit('lid-mapping.update', { lid, pn })
+							const mapping = { lid, pn }
+							ev.emit('lid-mapping.update', mapping)
+							mappings.push(mapping)
 						}
 					}
+					await signalRepository.lidMapping.storeLIDPNMappings(mappings)
 				}
 
 				break
