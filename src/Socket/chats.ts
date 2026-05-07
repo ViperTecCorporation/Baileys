@@ -92,6 +92,16 @@ export const makeChatsSocket = (config: SocketConfig) => {
 
 	let privacySettings: { [_: string]: string } | undefined
 
+	/** Server-assigned AB props for protocol behavior. */
+	const serverProps = {
+		/** AB prop 10518: gate tctoken on 1:1 messages. Default true (safe: avoids 463). */
+		privacyTokenOn1to1: true,
+		/** AB prop 9666: gate tctoken on profile picture IQs. WA Web default: true. */
+		profilePicPrivacyToken: true,
+		/** AB prop 14303: issue tctokens to LID instead of PN. WA Web default: false. */
+		lidTrustedTokenIssueToLid: false
+	}
+
 	let syncState: SyncState = SyncState.Connecting
 
 	/** this mutex ensures that messages are processed in order */
@@ -986,7 +996,22 @@ export const makeChatsSocket = (config: SocketConfig) => {
 			props = reduceBinaryNodeToDictionary(propsNode, 'prop')
 		}
 
-		logger.debug('fetched props')
+		const privacyTokenProp = props['10518'] ?? props['privacy_token_sending_on_all_1_on_1_messages']
+		if (privacyTokenProp !== undefined) {
+			serverProps.privacyTokenOn1to1 = privacyTokenProp === 'true' || privacyTokenProp === '1'
+		}
+
+		const profilePicProp = props['9666'] ?? props['profile_scraping_privacy_token_in_photo_iq']
+		if (profilePicProp !== undefined) {
+			serverProps.profilePicPrivacyToken = profilePicProp === 'true' || profilePicProp === '1'
+		}
+
+		const lidIssueProp = props['14303'] ?? props['lid_trusted_token_issue_to_lid']
+		if (lidIssueProp !== undefined) {
+			serverProps.lidTrustedTokenIssueToLid = lidIssueProp === 'true' || lidIssueProp === '1'
+		}
+
+		logger.debug({ serverProps }, 'fetched props')
 
 		return props
 	}
@@ -1423,6 +1448,7 @@ export const makeChatsSocket = (config: SocketConfig) => {
 
 	return {
 		...sock,
+		serverProps,
 		createCallLink,
 		getBotListV2,
 		messageMutex,
