@@ -1825,9 +1825,8 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			const isReachoutTimelocked = attrs.error === String(NACK_REASONS.SenderReachoutTimelocked)
 
 			if (attrs.error === SERVER_ERROR_CODES.MessageAccountRestriction) {
-				// Single retry: the original getPrivacyTokens IQ triggered token issuance.
-				// After a brief delay the server should have pushed a privacy_token
-				// notification, making the re-send succeed.
+				// 463 = account restriction or missing tctoken. Keep the local single
+				// message retry, but first trigger/dedupe token recovery for the target.
 				const msgId = attrs.id
 				const jid = jidNormalizedUser(attrs.from)
 				if (msgId && jid && !tcTokenRetriedMsgIds.has(msgId)) {
@@ -1835,6 +1834,28 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 					// is naturally bounded under normal conditions.
 					tcTokenRetriedMsgIds.add(msgId)
 					setTimeout(() => tcTokenRetriedMsgIds.delete(msgId), 60_000)
+
+					if (!inFlight463Recoveries.has(jid)) {
+						inFlight463Recoveries.add(jid)
+						void (async() => {
+							try {
+								const tcStorageJid = await resolveTcTokenJid(jid, getLIDForPN)
+								const result = await getPrivacyTokens([jid], unixTimestampSeconds())
+								await storeTcTokensFromIqResult({
+									result,
+									fallbackJid: tcStorageJid,
+									keys: authState.keys,
+									getLIDForPN,
+									onNewJidStored: trackTcTokenJid
+								})
+								logger.debug({ from: jid }, 'completed 463 token recovery issuance')
+							} catch (err: any) {
+								logger.debug({ from: jid, err: err?.message }, 'failed 463 token recovery issuance')
+							} finally {
+								inFlight463Recoveries.delete(jid)
+							}
+						})()
+					}
 
 					const msg =
 						(await getMessage(key)) ??
@@ -2002,6 +2023,8 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 
 	/** timestamp of last tctoken prune run — throttles to once per 24h */
 	let lastTcTokenPruneTs = 0
+	/** dedupe in-flight 463 recovery token issuance by target JID */
+	const inFlight463Recoveries = new Set<string>()
 
 	ev.on('connection.update', ({ isOnline, connection }) => {
 		if (typeof isOnline !== 'undefined') {
