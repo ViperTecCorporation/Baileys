@@ -1388,6 +1388,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 	return {
 		...sock,
 		getPrivacyTokens,
+		issuePrivacyTokens: getPrivacyTokens,
 		assertSessions,
 		relayMessage,
 		sendReceipt,

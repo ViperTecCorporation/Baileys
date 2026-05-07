@@ -62,6 +62,28 @@ export async function resolveTcTokenJid(
 	return lid ?? jid
 }
 
+/** Resolve target JID for issuing privacy token based on AB prop 14303 */
+export async function resolveIssuanceJid(
+	jid: string,
+	issueToLid: boolean,
+	getLIDForPN: (pn: string) => Promise<string | null>,
+	getPNForLID?: (lid: string) => Promise<string | null>
+): Promise<string> {
+	if (issueToLid) {
+		if (isLidUser(jid)) return jid
+		const lid = await getLIDForPN(jid)
+		return lid ?? jid
+	}
+
+	if (!isLidUser(jid)) return jid
+	if (getPNForLID) {
+		const pn = await getPNForLID(jid)
+		return pn ?? jid
+	}
+
+	return jid
+}
+
 type TcTokenParams = {
 	jid: string
 	baseContent?: BinaryNode[]

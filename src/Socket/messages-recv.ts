@@ -57,7 +57,12 @@ import {
 import { makeMutex } from '../Utils/make-mutex'
 import { makeOfflineNodeProcessor, type OfflineNodeType } from '../Utils/offline-node-processor'
 import { buildAckStanza } from '../Utils/stanza-ack'
-import { isTcTokenExpired, resolveTcTokenJid, storeTcTokensFromIqResult } from '../Utils/tc-token-utils'
+import {
+	isTcTokenExpired,
+	resolveIssuanceJid,
+	resolveTcTokenJid,
+	storeTcTokensFromIqResult
+} from '../Utils/tc-token-utils'
 import {
 	areJidsSameUser,
 	type BinaryNode,
@@ -125,6 +130,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		sendPeerDataOperationMessage,
 		messageRetryManager,
 		registerSocketEndHandler,
+		issuePrivacyTokens,
 		fetchAccountReachoutTimelock,
 		getPrivacyTokens
 	} = sock
@@ -133,8 +139,6 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 
 	/** this mutex ensures that each retryRequest will wait for the previous one to finish */
 	const retryMutex = makeMutex()
-	/** tracks message IDs that have already been retried for error 463 */
-	const tcTokenRetriedMsgIds = new Set<string>()
 
 	const msgRetryCache =
 		config.msgRetryCounterCache ||
@@ -1825,61 +1829,44 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			const isReachoutTimelocked = attrs.error === String(NACK_REASONS.SenderReachoutTimelocked)
 
 			if (attrs.error === SERVER_ERROR_CODES.MessageAccountRestriction) {
-				// 463 = account restriction or missing tctoken. Keep the local single
-				// message retry, but first trigger/dedupe token recovery for the target.
-				const msgId = attrs.id
-				const jid = jidNormalizedUser(attrs.from)
-				if (msgId && jid && !tcTokenRetriedMsgIds.has(msgId)) {
-					// Each entry auto-expires via setTimeout(60s), so the set
-					// is naturally bounded under normal conditions.
-					tcTokenRetriedMsgIds.add(msgId)
-					setTimeout(() => tcTokenRetriedMsgIds.delete(msgId), 60_000)
+				// 463 = 1:1 message missing privacy token (tctoken). Usually means the
+				// account is restricted: WhatsApp blocks starting new chats but preserves
+				// existing ones, since established chats already carry a tctoken.
+				// WA Web prevents this client-side (disables the compose bar).
+				// No retry — retrying counts as another "reach out" and worsens the restriction.
+				logger.warn(
+					{ msgId: attrs.id, from: attrs.from },
+					'error 463: account restricted or missing tctoken for contact'
+				)
 
-					if (!inFlight463Recoveries.has(jid)) {
-						inFlight463Recoveries.add(jid)
-						void (async() => {
-							try {
-								const tcStorageJid = await resolveTcTokenJid(jid, getLIDForPN)
-								const result = await getPrivacyTokens([jid], unixTimestampSeconds())
-								await storeTcTokensFromIqResult({
-									result,
-									fallbackJid: tcStorageJid,
-									keys: authState.keys,
-									getLIDForPN,
-									onNewJidStored: trackTcTokenJid
-								})
-								logger.debug({ from: jid }, 'completed 463 token recovery issuance')
-							} catch (err: any) {
-								logger.debug({ from: jid, err: err?.message }, 'failed 463 token recovery issuance')
-							} finally {
-								inFlight463Recoveries.delete(jid)
-							}
-						})()
-					}
-
-					const msg =
-						(await getMessage(key)) ??
-						// Fallback to retry manager cache — the user's getMessage store
-						// may not have persisted the message yet (ack arrives <30ms after send)
-						messageRetryManager?.getRecentMessage(jid, msgId)?.message
-					if (msg) {
-						//eslint-disable-next-line max-depth
+				const ackFrom = attrs.from
+				if (ackFrom && !inFlight463Recoveries.has(ackFrom)) {
+					inFlight463Recoveries.add(ackFrom)
+					void (async () => {
 						try {
-							await delay(1500)
-							await relayMessage(jid, msg, {
-								messageId: msgId,
-								useUserDevicesCache: true
+							const getPNForLID = signalRepository.lidMapping.getPNForLID.bind(signalRepository.lidMapping)
+							const tcStorageJid = await resolveTcTokenJid(ackFrom, getLIDForPN)
+							const issueJid = await resolveIssuanceJid(
+								ackFrom,
+								sock.serverProps.lidTrustedTokenIssueToLid,
+								getLIDForPN,
+								getPNForLID
+							)
+							const result = await issuePrivacyTokens([issueJid], unixTimestampSeconds())
+							await storeTcTokensFromIqResult({
+								result,
+								fallbackJid: tcStorageJid,
+								keys: authState.keys,
+								getLIDForPN,
+								onNewJidStored: trackTcTokenJid
 							})
-							logger.info({ msgId, from: jid }, 'error 463 retry succeeded')
-							return
-						} catch (retryErr: any) {
-							logger.warn({ msgId, err: retryErr?.message }, 'error 463 retry failed')
+							logger.debug({ from: ackFrom }, 'completed 463 token recovery issuance')
+						} catch (err: any) {
+							logger.debug({ from: ackFrom, err: err?.message }, 'failed 463 token recovery issuance')
+						} finally {
+							inFlight463Recoveries.delete(ackFrom)
 						}
-					} else {
-						logger.warn({ msgId, from: jid }, 'error 463: no message found for retry')
-					}
-				} else if (msgId && tcTokenRetriedMsgIds.has(msgId)) {
-					logger.warn({ msgId, from: jid }, 'error 463: already retried, giving up')
+					})()
 				}
 			} else if (attrs.error === SERVER_ERROR_CODES.SmaxInvalid) {
 				logger.warn(
