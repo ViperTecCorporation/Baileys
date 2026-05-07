@@ -399,8 +399,8 @@ describe('getErrorCodeFromStreamError', () => {
 // ─── Phase 3: SERVER_ERROR_CODES constants ──────────────────────────────
 
 describe('SERVER_ERROR_CODES', () => {
-	it('MissingTcToken is 463', () => {
-		expect(SERVER_ERROR_CODES.MissingTcToken).toBe('463')
+	it('MessageAccountRestriction is 463', () => {
+		expect(SERVER_ERROR_CODES.MessageAccountRestriction).toBe('463')
 	})
 
 	it('SmaxInvalid is 479', () => {

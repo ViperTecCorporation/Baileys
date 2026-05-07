@@ -1823,7 +1823,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		if (attrs.error) {
 			const isReachoutTimelocked = attrs.error === String(NACK_REASONS.SenderReachoutTimelocked)
 
-			if (attrs.error === SERVER_ERROR_CODES.MissingTcToken) {
+			if (attrs.error === SERVER_ERROR_CODES.MessageAccountRestriction) {
 				// Single retry: the original getPrivacyTokens IQ triggered token issuance.
 				// After a brief delay the server should have pushed a privacy_token
 				// notification, making the re-send succeed.
