@@ -124,6 +124,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		uploadPreKeys,
 		sendPeerDataOperationMessage,
 		messageRetryManager,
+		registerSocketEndHandler,
 		fetchAccountReachoutTimelock,
 		getPrivacyTokens
 	} = sock
@@ -2031,6 +2032,23 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				void pruneExpiredTcTokens()
 			}
 		}
+	})
+
+	registerSocketEndHandler(() => {
+		if (!config.msgRetryCounterCache && msgRetryCache.close) {
+			msgRetryCache.close()
+		}
+
+		if (!config.callOfferCache && callOfferCache.close) {
+			callOfferCache.close()
+		}
+
+		if (!config.placeholderResendCache && placeholderResendCache.close) {
+			placeholderResendCache.close()
+		}
+
+		identityAssertDebounce.close()
+		sendActiveReceipts = false
 	})
 
 	async function pruneExpiredTcTokens() {
