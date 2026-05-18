@@ -1,0 +1,124 @@
+name: Publish Git Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - addbuttonsupport
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-git-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish-git-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Enable Corepack and Set Yarn Version
+        run: |
+          corepack enable
+          corepack prepare yarn@4.x --activate
+
+      - name: Restore Yarn Cache
+        uses: actions/cache@v4
+        id: yarn-cache
+        with:
+          path: .yarn/cache
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build package
+        run: yarn build
+
+      - name: Prepare git package
+        run: |
+          set -euo pipefail
+
+          publish_dir="$(mktemp -d)"
+
+          cp package.json yarn.lock engine-requirements.js "$publish_dir/"
+          cp -R lib WAProto "$publish_dir/"
+
+          for file in README.md LICENSE LICENSE.md CHANGELOG.md; do
+            if [ -f "$file" ]; then
+              cp "$file" "$publish_dir/"
+            fi
+          done
+
+          node - "$publish_dir/package.json" <<'NODE'
+          const fs = require('fs')
+          const packageJsonPath = process.argv[2]
+          const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
+
+          if (pkg.scripts) {
+            delete pkg.scripts.prepare
+            delete pkg.scripts.prepack
+          }
+
+          pkg.baileysGitBuild = {
+            sourceBranch: process.env.GITHUB_REF_NAME,
+            sourceCommit: process.env.GITHUB_SHA,
+            builtAt: new Date().toISOString()
+          }
+
+          fs.writeFileSync(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`)
+          NODE
+
+          {
+            echo "# Baileys Git Build"
+            echo
+            echo "Source branch: ${GITHUB_REF_NAME}"
+            echo "Source commit: ${GITHUB_SHA}"
+            echo "Built at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          } > "$publish_dir/BUILD_INFO.md"
+
+          echo "PUBLISH_DIR=$publish_dir" >> "$GITHUB_ENV"
+
+      - name: Publish Main branch
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin +refs/heads/Main:refs/remotes/origin/Main || true
+
+          worktree_dir="$(mktemp -d)"
+          if git show-ref --verify --quiet refs/remotes/origin/Main; then
+            git worktree add -B Main "$worktree_dir" origin/Main
+          else
+            git worktree add --detach "$worktree_dir"
+            git -C "$worktree_dir" switch --orphan Main
+          fi
+
+          find "$worktree_dir" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R "$PUBLISH_DIR"/. "$worktree_dir/"
+
+          git -C "$worktree_dir" add -A
+
+          if git -C "$worktree_dir" diff --cached --quiet; then
+            echo "No build changes to publish."
+            exit 0
+          fi
+
+          git -C "$worktree_dir" commit -m "build: publish ${GITHUB_REF_NAME} ${GITHUB_SHA::7}"
+          git -C "$worktree_dir" push origin HEAD:Main
