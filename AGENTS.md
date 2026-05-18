@@ -15,6 +15,50 @@
 - Skipped `ac90a2d` because it was already ported as `f50feea`.
 - Skipped `402f479` because the tctoken lifecycle work was already ported through the local tctoken commits.
 
+## Compiled Git build for Uno
+
+- `addbuttonsupport` remains the source branch for local Baileys changes.
+- The GitHub Actions workflow `.github/workflows/publish-git-build.yml` builds `addbuttonsupport` and publishes the compiled package to the `Main` branch.
+- The `Main` branch is generated output. Do not edit it manually; change `addbuttonsupport`, push it, and let the workflow refresh `Main`.
+- The workflow runs on pushes to `addbuttonsupport` and can also be started manually from GitHub Actions as `Publish Git Build`.
+- The generated `Main` branch contains `lib/`, `WAProto/`, `package.json`, `yarn.lock`, docs/license files, and `BUILD_INFO.md`.
+- The workflow removes `prepare` and `prepack` from the generated `package.json` so downstream projects do not rebuild Baileys during install.
+- `BUILD_INFO.md` and `package.json.baileysGitBuild` record the source branch, source commit, and build timestamp used to produce `Main`.
+- Uno should reference the compiled branch directly:
+
+```json
+{
+  "dependencies": {
+    "baileys": "git+https://github.com/ViperTecCorporation/Baileys.git#Main"
+  }
+}
+```
+
+- For reproducible installs, prefer pinning Uno to a specific `Main` commit or tag instead of the moving branch:
+
+```json
+{
+  "dependencies": {
+    "baileys": "git+https://github.com/ViperTecCorporation/Baileys.git#<main-build-commit-or-tag>"
+  }
+}
+```
+
+- To publish a new Git build after changing Baileys, push `addbuttonsupport`:
+
+```bash
+git checkout addbuttonsupport
+git push origin addbuttonsupport
+```
+
+- To create a named Git release for Uno, tag the generated `Main` commit after the workflow succeeds:
+
+```bash
+git fetch origin Main
+git tag baileys-main-YYYY-MM-DD origin/Main
+git push origin baileys-main-YYYY-MM-DD
+```
+
 Guide for AI coding agents (Claude Code, Cursor, Aider, Codex, Copilot Workspace, etc.) contributing to Baileys. Human contributors should also read this — there's nothing AI-specific in the conventions, only in the disclosure rules at the end.
 
 If you are an AI agent driving this repo, read this file first, then `CODE_OF_CONDUCT.md` (specifically the AI policy section), then `SECURITY.md`.
