@@ -1,7 +1,7 @@
 {
   "name": "baileys",
   "type": "module",
-  "version": "7.0.0-rc11",
+  "version": "7.0.0-rc13",
   "description": "A WebSockets library for interacting with WhatsApp Web",
   "keywords": [
     "whatsapp",
@@ -136,7 +136,7 @@
   },
   "baileysGitBuild": {
     "sourceBranch": "addbuttonsupport",
-    "sourceCommit": "9676fbc09cfa1b0a40d528f20c408128948a9496",
-    "builtAt": "2026-05-18T01:58:02.009Z"
+    "sourceCommit": "03083bc2b6622120da4fc7756a2e414580956773",
+    "builtAt": "2026-05-31T23:26:39.170Z"
   }
 }
