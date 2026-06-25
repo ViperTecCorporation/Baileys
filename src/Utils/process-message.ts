@@ -34,6 +34,7 @@ import { aesDecryptGCM, hmacSign } from './crypto'
 import { getKeyAuthor, toNumber } from './generics'
 import { downloadAndProcessHistorySyncNotification } from './history'
 import type { ILogger } from './logger'
+import { storeNctSalt } from './tc-token-utils'
 
 type ProcessMessageContext = {
 	shouldProcessHistoryMsg: boolean
@@ -412,6 +413,40 @@ const processMessage = async (
 						await signalRepository.lidMapping
 							.storeLIDPNMappings(data.lidPnMappings)
 							.catch(err => logger?.warn({ err }, 'failed to store LID-PN mappings from history sync'))
+					}
+
+					if (data.tcTokens?.length) {
+						logger?.debug({ count: data.tcTokens.length }, 'processing tctokens from history sync')
+						try {
+							await keyStore.set({
+								tctoken: Object.fromEntries(
+									await Promise.all(
+										data.tcTokens.map(async token => {
+											const jid = await signalRepository.lidMapping.getLIDForPN(token.jid).catch(() => null)
+											return [
+												jid || token.jid,
+												{
+													token: token.token || Buffer.alloc(0),
+													timestamp: token.timestamp,
+													senderTimestamp: token.senderTimestamp
+												}
+											]
+										})
+									)
+								)
+							})
+						} catch (err) {
+							logger?.warn({ err }, 'failed to store tctokens from history sync')
+						}
+					}
+
+					if (data.nctSalt?.length) {
+						try {
+							await storeNctSalt(keyStore, data.nctSalt)
+							logger?.debug('stored nct salt from history sync')
+						} catch (err) {
+							logger?.warn({ err }, 'failed to store nct salt from history sync')
+						}
 					}
 
 					ev.emit('messaging-history.set', {

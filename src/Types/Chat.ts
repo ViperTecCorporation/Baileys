@@ -47,6 +47,7 @@ export type BotListInfo = {
 export type ChatMutation = {
 	syncAction: proto.ISyncActionData
 	index: string[]
+	operation?: proto.SyncdMutation.SyncdOperation
 }
 
 export type WAPatchCreate = {

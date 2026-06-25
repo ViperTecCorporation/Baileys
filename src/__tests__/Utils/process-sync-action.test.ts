@@ -35,10 +35,12 @@ const createMockLogger = (): ILogger =>
 
 const createSyncAction = (
 	action: proto.ISyncActionValue,
-	index: string[] = ['type', 'id', 'msgId', '0']
+	index: string[] = ['type', 'id', 'msgId', '0'],
+	operation?: proto.SyncdMutation.SyncdOperation
 ): ChatMutation => ({
 	syncAction: { value: action },
-	index
+	index,
+	operation
 })
 
 const mockMe: Contact = { id: 'me@s.whatsapp.net', name: 'Test User' }
@@ -342,6 +344,37 @@ describe('processSyncAction', () => {
 			const syncAction = createSyncAction({ unarchiveChatsSetting: { unarchiveChats: true } }, ['unarchiveChats'])
 			processSyncAction(syncAction, ev, mockMe, undefined, logger)
 			expect(ev.emit).toHaveBeenCalledWith('creds.update', { accountSettings: { unarchiveChats: true } })
+		})
+	})
+
+	describe('nct salt sync action', () => {
+		it('stores nct salt on set mutation', () => {
+			const onNctSalt = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+			const salt = Buffer.from([9, 9, 9])
+			const syncAction = createSyncAction(
+				{ nctSaltSyncAction: { salt } },
+				['nct_salt_sync'],
+				proto.SyncdMutation.SyncdOperation.SET
+			)
+
+			processSyncAction(syncAction, ev, mockMe, undefined, logger, { onNctSalt })
+
+			expect(onNctSalt).toHaveBeenCalledWith(salt)
+			expect(ev.emit).not.toHaveBeenCalled()
+		})
+
+		it('removes nct salt on remove mutation', () => {
+			const onNctSalt = jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+			const syncAction = createSyncAction(
+				{ nctSaltSyncAction: {} },
+				['nct_salt_sync'],
+				proto.SyncdMutation.SyncdOperation.REMOVE
+			)
+
+			processSyncAction(syncAction, ev, mockMe, undefined, logger, { onNctSalt })
+
+			expect(onNctSalt).toHaveBeenCalledWith(null)
+			expect(ev.emit).not.toHaveBeenCalled()
 		})
 	})
 

@@ -1,7 +1,14 @@
 import { jest } from '@jest/globals'
 import { DisconnectReason, type SignalKeyStoreWithTransaction } from '../../Types'
 import { getErrorCodeFromStreamError, SERVER_ERROR_CODES } from '../../Utils'
-import { buildTcTokenFromJid, isTcTokenExpired, shouldSendNewTcToken } from '../../Utils/tc-token-utils'
+import { hmacSign } from '../../Utils/crypto'
+import {
+	buildCsTokenFromStoredSalt,
+	buildTcTokenFromJid,
+	isTcTokenExpired,
+	shouldSendNewTcToken,
+	storeNctSalt
+} from '../../Utils/tc-token-utils'
 import type { BinaryNode } from '../../WABinary'
 
 /** 7 days in seconds — matches WA Web tctoken_duration */
@@ -274,6 +281,66 @@ describe('buildTcTokenFromJid', () => {
 		mockKeys.get.mockResolvedValue({ [TEST_JID]: { token: VALID_TOKEN } })
 
 		const result = await buildTcTokenFromJid({ authState: { keys: mockKeys }, jid: TEST_JID })
+
+		expect(result).toBeUndefined()
+	})
+})
+
+describe('cstoken fallback', () => {
+	const ME_LID = '123456789012345@lid'
+	const NCT_SALT = Buffer.from([8, 6, 7, 5, 3, 0, 9])
+
+	let mockKeys: jest.Mocked<SignalKeyStoreWithTransaction>
+
+	beforeEach(() => {
+		mockKeys = createMockKeys()
+	})
+
+	it('stores nct salt in the tctoken key namespace', async () => {
+		await storeNctSalt(mockKeys, NCT_SALT)
+
+		expect(mockKeys.set).toHaveBeenCalledWith({
+			tctoken: {
+				__nct_salt__: { nctSalt: NCT_SALT }
+			}
+		})
+	})
+
+	it('builds cstoken from stored nct salt and own LID', async () => {
+		// @ts-ignore
+		mockKeys.get.mockResolvedValue({ __nct_salt__: { nctSalt: NCT_SALT } })
+
+		const result = await buildCsTokenFromStoredSalt({
+			authState: { keys: mockKeys },
+			meLid: ME_LID
+		})
+
+		expect(result).toHaveLength(1)
+		expect(result![0]).toEqual({
+			tag: 'cstoken',
+			attrs: {},
+			content: hmacSign(Buffer.from(ME_LID), NCT_SALT)
+		})
+	})
+
+	it('returns existing content when cstoken cannot be built', async () => {
+		// @ts-ignore
+		mockKeys.get.mockResolvedValue({})
+		const existingNode: BinaryNode = { tag: 'picture', attrs: { type: 'image' } }
+
+		const result = await buildCsTokenFromStoredSalt({
+			authState: { keys: mockKeys },
+			meLid: ME_LID,
+			baseContent: [existingNode]
+		})
+
+		expect(result).toEqual([existingNode])
+	})
+
+	it('returns undefined when own LID is missing and no base content exists', async () => {
+		const result = await buildCsTokenFromStoredSalt({
+			authState: { keys: mockKeys }
+		})
 
 		expect(result).toBeUndefined()
 	})

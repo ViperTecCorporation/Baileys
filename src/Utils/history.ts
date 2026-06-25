@@ -49,6 +49,7 @@ export const processHistoryMessage = (item: proto.IHistorySync, logger?: ILogger
 	const contacts: Contact[] = []
 	const chats: Chat[] = []
 	const lidPnMappings: LIDMapping[] = []
+	const tcTokens: { jid: string; token?: Buffer; timestamp?: string; senderTimestamp?: number }[] = []
 
 	logger?.trace({ progress: item.progress }, 'processing history of type ' + item.syncType?.toString())
 
@@ -56,6 +57,23 @@ export const processHistoryMessage = (item: proto.IHistorySync, logger?: ILogger
 	for (const m of item.phoneNumberToLidMappings || []) {
 		if (m.lidJid && m.pnJid) {
 			lidPnMappings.push({ lid: m.lidJid, pn: m.pnJid })
+		}
+	}
+
+	for (const c of item.inlineContacts || []) {
+		const id = c.lidJid || c.pnJid
+		if (id) {
+			contacts.push({
+				id,
+				name: c.fullName || c.firstName || c.username || undefined,
+				username: c.username || undefined,
+				lid: c.lidJid || undefined,
+				phoneNumber: c.pnJid || undefined
+			})
+		}
+
+		if (c.lidJid && c.pnJid) {
+			lidPnMappings.push({ lid: c.lidJid, pn: c.pnJid })
 		}
 	}
 
@@ -74,6 +92,15 @@ export const processHistoryMessage = (item: proto.IHistorySync, logger?: ILogger
 				})
 
 				const chatId = chat.id!
+				if (chat.tcToken || chat.tcTokenTimestamp || chat.tcTokenSenderTimestamp) {
+					tcTokens.push({
+						jid: chat.lidJid || chat.accountLid || chat.id!,
+						token: chat.tcToken ? Buffer.from(chat.tcToken) : undefined,
+						timestamp: chat.tcTokenTimestamp ? String(toNumber(chat.tcTokenTimestamp)) : undefined,
+						senderTimestamp: chat.tcTokenSenderTimestamp ? toNumber(chat.tcTokenSenderTimestamp) : undefined
+					})
+				}
+
 				const isLid = isLidUser(chatId) || isHostedLidUser(chatId)
 				const isPn = isPnUser(chatId) || isHostedPnUser(chatId)
 				if (isLid && chat.pnJid) {
@@ -133,6 +160,8 @@ export const processHistoryMessage = (item: proto.IHistorySync, logger?: ILogger
 		contacts,
 		messages,
 		lidPnMappings,
+		tcTokens,
+		nctSalt: item.nctSalt ? Buffer.from(item.nctSalt) : undefined,
 		pastParticipants: item.pastParticipants,
 		syncType: item.syncType,
 		progress: item.progress

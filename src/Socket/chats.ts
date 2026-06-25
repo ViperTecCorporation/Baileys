@@ -47,7 +47,7 @@ import {
 } from '../Utils'
 import { makeMutex } from '../Utils/make-mutex'
 import processMessage from '../Utils/process-message'
-import { buildTcTokenFromJid } from '../Utils/tc-token-utils'
+import { buildTcTokenFromJid, storeNctSalt } from '../Utils/tc-token-utils'
 import {
 	type BinaryNode,
 	getBinaryNodeChild,
@@ -538,7 +538,10 @@ export const makeChatsSocket = (config: SocketConfig) => {
 					ev,
 					authState.creds.me!,
 					isInitialSync ? { accountSettings: authState.creds.accountSettings } : undefined,
-					logger
+					logger,
+					{
+						onNctSalt: salt => storeNctSalt(authState.keys, salt)
+					}
 				)
 			}
 		}

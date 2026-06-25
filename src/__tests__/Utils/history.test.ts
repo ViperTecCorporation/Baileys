@@ -48,6 +48,35 @@ describe('processHistoryMessage', () => {
 			expect(result.lidPnMappings).toEqual([])
 		})
 
+		it('should extract LID-PN mappings and contacts from inline contacts', () => {
+			const historySync: proto.IHistorySync = {
+				syncType: proto.HistorySync.HistorySyncType.INITIAL_BOOTSTRAP,
+				conversations: [],
+				inlineContacts: [
+					{
+						pnJid: '1234567890123@s.whatsapp.net',
+						lidJid: '11111111111111@lid',
+						fullName: 'Inline User',
+						username: 'inline_user'
+					}
+				]
+			}
+
+			const result = processHistoryMessage(historySync)
+
+			expect(result.lidPnMappings).toContainEqual({
+				lid: '11111111111111@lid',
+				pn: '1234567890123@s.whatsapp.net'
+			})
+			expect(result.contacts).toContainEqual({
+				id: '11111111111111@lid',
+				name: 'Inline User',
+				username: 'inline_user',
+				lid: '11111111111111@lid',
+				phoneNumber: '1234567890123@s.whatsapp.net'
+			})
+		})
+
 		it('should process mappings regardless of sync type', () => {
 			const syncTypes = [proto.HistorySync.HistorySyncType.PUSH_NAME, proto.HistorySync.HistorySyncType.ON_DEMAND]
 
@@ -89,6 +118,46 @@ describe('processHistoryMessage', () => {
 				lid: '11111111111111@lid',
 				phoneNumber: '1234567890123@s.whatsapp.net'
 			})
+		})
+
+		it('should extract trusted contact tokens from conversations', () => {
+			const token = Buffer.from([4, 1, 33, 254, 110])
+			const historySync: proto.IHistorySync = {
+				syncType: proto.HistorySync.HistorySyncType.INITIAL_BOOTSTRAP,
+				conversations: [
+					{
+						id: '1234567890123@s.whatsapp.net',
+						lidJid: '11111111111111@lid',
+						tcToken: token,
+						tcTokenTimestamp: 1770912853,
+						tcTokenSenderTimestamp: 1770912855
+					}
+				]
+			}
+
+			const result = processHistoryMessage(historySync)
+
+			expect(result.tcTokens).toEqual([
+				{
+					jid: '11111111111111@lid',
+					token,
+					timestamp: '1770912853',
+					senderTimestamp: 1770912855
+				}
+			])
+		})
+
+		it('should extract nct salt from history sync', () => {
+			const nctSalt = Buffer.from([9, 9, 9])
+			const historySync: proto.IHistorySync = {
+				syncType: proto.HistorySync.HistorySyncType.INITIAL_BOOTSTRAP,
+				conversations: [],
+				nctSalt
+			}
+
+			const result = processHistoryMessage(historySync)
+
+			expect(result.nctSalt).toEqual(nctSalt)
 		})
 	})
 

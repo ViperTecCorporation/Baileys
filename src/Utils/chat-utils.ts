@@ -273,7 +273,7 @@ export const decodeSyncdMutations = async (
 		}
 
 		const indexStr = Buffer.from(syncAction.index!).toString()
-		onMutation({ syncAction, index: JSON.parse(indexStr) })
+		onMutation({ syncAction, index: JSON.parse(indexStr), operation: operation! })
 
 		ltGenerator.mix({
 			indexMac: record.index!.blob!,
@@ -813,7 +813,10 @@ export const processSyncAction = (
 	ev: BaileysEventEmitter,
 	me: Contact,
 	initialSyncOpts?: InitialAppStateSyncOptions,
-	logger?: ILogger
+	logger?: ILogger,
+	options?: {
+		onNctSalt?: (salt: Uint8Array | null) => Promise<void>
+	}
 ) => {
 	const isInitialSync = !!initialSyncOpts
 	const accountSettings = initialSyncOpts?.accountSettings
@@ -999,6 +1002,14 @@ export const processSyncAction = (
 			setting: 'channelsPersonalisedRecommendation',
 			value: action.privacySettingChannelsPersonalisedRecommendationAction
 		})
+	} else if (action?.nctSaltSyncAction || type === 'nct_salt_sync') {
+		if (syncAction.operation === proto.SyncdMutation.SyncdOperation.REMOVE) {
+			options?.onNctSalt?.(null).catch(err => logger?.warn({ err }, 'failed to remove nct salt from app state'))
+		} else if (action?.nctSaltSyncAction?.salt?.length) {
+			options
+				?.onNctSalt?.(action.nctSaltSyncAction.salt)
+				.catch(err => logger?.warn({ err }, 'failed to store nct salt from app state'))
+		}
 	} else {
 		logger?.debug({ syncAction, id }, 'unprocessable update')
 	}

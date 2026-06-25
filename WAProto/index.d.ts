@@ -3934,6 +3934,7 @@ export namespace proto {
             supportGuestChat?: (boolean|null);
             completeOnDemandReady?: (boolean|null);
             thumbnailSyncDaysLimit?: (number|null);
+            supportInlineContacts?: (boolean|null);
         }
 
         class HistorySyncConfig implements IHistorySyncConfig {
@@ -3957,6 +3958,7 @@ export namespace proto {
             public supportGuestChat?: (boolean|null);
             public completeOnDemandReady?: (boolean|null);
             public thumbnailSyncDaysLimit?: (number|null);
+            public supportInlineContacts?: (boolean|null);
             public static create(properties?: proto.DeviceProps.IHistorySyncConfig): proto.DeviceProps.HistorySyncConfig;
             public static encode(m: proto.DeviceProps.IHistorySyncConfig, w?: $protobuf.Writer): $protobuf.Writer;
             public static decode(r: ($protobuf.Reader|Uint8Array), l?: number): proto.DeviceProps.HistorySyncConfig;
@@ -4532,6 +4534,9 @@ export namespace proto {
         companionMetaNonce?: (string|null);
         shareableChatIdentifierEncryptionKey?: (Uint8Array|null);
         accounts?: (proto.IAccount[]|null);
+        nctSalt?: (Uint8Array|null);
+        inlineContacts?: (proto.IInlineContact[]|null);
+        inlineContactsProvided?: (boolean|null);
     }
 
     class HistorySync implements IHistorySync {
@@ -4553,6 +4558,9 @@ export namespace proto {
         public companionMetaNonce?: (string|null);
         public shareableChatIdentifierEncryptionKey?: (Uint8Array|null);
         public accounts: proto.IAccount[];
+        public nctSalt?: (Uint8Array|null);
+        public inlineContacts: proto.IInlineContact[];
+        public inlineContactsProvided?: (boolean|null);
         public static create(properties?: proto.IHistorySync): proto.HistorySync;
         public static encode(m: proto.IHistorySync, w?: $protobuf.Writer): $protobuf.Writer;
         public static decode(r: ($protobuf.Reader|Uint8Array), l?: number): proto.HistorySync;
@@ -4816,6 +4824,30 @@ export namespace proto {
             public toJSON(): { [k: string]: any };
             public static getTypeUrl(typeUrlPrefix?: string): string;
         }
+    }
+
+    interface IInlineContact {
+        pnJid?: (string|null);
+        lidJid?: (string|null);
+        fullName?: (string|null);
+        firstName?: (string|null);
+        username?: (string|null);
+    }
+
+    class InlineContact implements IInlineContact {
+        constructor(p?: proto.IInlineContact);
+        public pnJid?: (string|null);
+        public lidJid?: (string|null);
+        public fullName?: (string|null);
+        public firstName?: (string|null);
+        public username?: (string|null);
+        public static create(properties?: proto.IInlineContact): proto.InlineContact;
+        public static encode(m: proto.IInlineContact, w?: $protobuf.Writer): $protobuf.Writer;
+        public static decode(r: ($protobuf.Reader|Uint8Array), l?: number): proto.InlineContact;
+        public static fromObject(d: { [k: string]: any }): proto.InlineContact;
+        public static toObject(m: proto.InlineContact, o?: $protobuf.IConversionOptions): { [k: string]: any };
+        public toJSON(): { [k: string]: any };
+        public static getTypeUrl(typeUrlPrefix?: string): string;
     }
 
     interface IInteractiveAnnotation {
@@ -11494,6 +11526,7 @@ export namespace proto {
         newsletterSavedInterestsAction?: (proto.SyncActionValue.INewsletterSavedInterestsAction|null);
         aiThreadRenameAction?: (proto.SyncActionValue.IAiThreadRenameAction|null);
         interactiveMessageAction?: (proto.SyncActionValue.IInteractiveMessageAction|null);
+        nctSaltSyncAction?: (proto.SyncActionValue.INctSaltSyncAction|null);
     }
 
     class SyncActionValue implements ISyncActionValue {
@@ -11567,6 +11600,7 @@ export namespace proto {
         public newsletterSavedInterestsAction?: (proto.SyncActionValue.INewsletterSavedInterestsAction|null);
         public aiThreadRenameAction?: (proto.SyncActionValue.IAiThreadRenameAction|null);
         public interactiveMessageAction?: (proto.SyncActionValue.IInteractiveMessageAction|null);
+        public nctSaltSyncAction?: (proto.SyncActionValue.INctSaltSyncAction|null);
         public static create(properties?: proto.ISyncActionValue): proto.SyncActionValue;
         public static encode(m: proto.ISyncActionValue, w?: $protobuf.Writer): $protobuf.Writer;
         public static decode(r: ($protobuf.Reader|Uint8Array), l?: number): proto.SyncActionValue;
@@ -12371,6 +12405,22 @@ export namespace proto {
             public static decode(r: ($protobuf.Reader|Uint8Array), l?: number): proto.SyncActionValue.NewsletterSavedInterestsAction;
             public static fromObject(d: { [k: string]: any }): proto.SyncActionValue.NewsletterSavedInterestsAction;
             public static toObject(m: proto.SyncActionValue.NewsletterSavedInterestsAction, o?: $protobuf.IConversionOptions): { [k: string]: any };
+            public toJSON(): { [k: string]: any };
+            public static getTypeUrl(typeUrlPrefix?: string): string;
+        }
+
+        interface INctSaltSyncAction {
+            salt?: (Uint8Array|null);
+        }
+
+        class NctSaltSyncAction implements INctSaltSyncAction {
+            constructor(p?: proto.SyncActionValue.INctSaltSyncAction);
+            public salt?: (Uint8Array|null);
+            public static create(properties?: proto.SyncActionValue.INctSaltSyncAction): proto.SyncActionValue.NctSaltSyncAction;
+            public static encode(m: proto.SyncActionValue.INctSaltSyncAction, w?: $protobuf.Writer): $protobuf.Writer;
+            public static decode(r: ($protobuf.Reader|Uint8Array), l?: number): proto.SyncActionValue.NctSaltSyncAction;
+            public static fromObject(d: { [k: string]: any }): proto.SyncActionValue.NctSaltSyncAction;
+            public static toObject(m: proto.SyncActionValue.NctSaltSyncAction, o?: $protobuf.IConversionOptions): { [k: string]: any };
             public toJSON(): { [k: string]: any };
             public static getTypeUrl(typeUrlPrefix?: string): string;
         }

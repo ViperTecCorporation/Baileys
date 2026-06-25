@@ -42,6 +42,7 @@ import { makeKeyedMutex, makeMutex } from '../Utils/make-mutex'
 import { getMessageReportingToken, shouldIncludeReportingToken } from '../Utils/reporting-utils'
 import { isRetryableStaleConnectionError } from '../Utils/retryable-send'
 import {
+	buildCsTokenFromStoredSalt,
 	isTcTokenExpired,
 	resolveTcTokenJid,
 	shouldSendNewTcToken,
@@ -1090,7 +1091,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 
 			// WA Web never attaches tctoken to peer (AppStateSync) messages; server rejects with 479.
 			const isPeerMessage = additionalAttributes?.['category'] === 'peer'
-			const is1on1Send = !isGroup && !isRetryResend && !isStatus && !isNewsletter && !isPeerMessage
+			const is1on1Send = !isGroup && !isStatus && !isNewsletter && !isPeerMessage
 			let didFetchTcToken = false
 
 			// Resolve destination to LID for tctoken storage — matches Signal session key pattern
@@ -1172,6 +1173,15 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					attrs: {},
 					content: tcTokenBuffer
 				})
+			} else if (is1on1Send) {
+				const csTokenContent = await buildCsTokenFromStoredSalt({
+					authState,
+					meLid: authState.creds.me?.lid
+				})
+				if (csTokenContent?.length) {
+					;(stanza.content as BinaryNode[]).push(...csTokenContent)
+					logger.debug({ jid: destinationJid }, 'attached cstoken fallback to 1:1 message')
+				}
 			}
 
 			if (additionalNodes && additionalNodes.length > 0) {

@@ -118,7 +118,8 @@ export const generateRegistrationNode = (
 			supportMessageAssociation: true,
 			supportGroupHistory: false,
 			onDemandReady: undefined,
-			supportGuestChat: undefined
+			supportGuestChat: undefined,
+			supportInlineContacts: true
 		},
 		version: {
 			primary: 10,

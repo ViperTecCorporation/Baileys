@@ -1,11 +1,13 @@
 import type { SignalKeyStoreWithTransaction } from '../Types'
 import type { BinaryNode } from '../WABinary'
 import { getBinaryNodeChild, getBinaryNodeChildren, isLidUser, jidNormalizedUser } from '../WABinary'
+import { hmacSign } from './crypto'
 
 /** 7 days in seconds — matches WA Web AB prop tctoken_duration */
 const TC_TOKEN_BUCKET_DURATION = 604800
 /** 4 buckets → ~28-day rolling window — matches WA Web AB prop tctoken_num_buckets */
 const TC_TOKEN_NUM_BUCKETS = 4
+const NCT_SALT_KEY = '__nct_salt__'
 
 /**
  * Check if a received token is expired using WA Web's rolling bucket algorithm.
@@ -93,6 +95,14 @@ type TcTokenParams = {
 	getLIDForPN?: (pn: string) => Promise<string | null>
 }
 
+type CsTokenParams = {
+	baseContent?: BinaryNode[]
+	authState: {
+		keys: SignalKeyStoreWithTransaction
+	}
+	meLid?: string
+}
+
 export async function buildTcTokenFromJid({
 	authState,
 	jid,
@@ -122,6 +132,38 @@ export async function buildTcTokenFromJid({
 
 		return baseContent
 	} catch (error) {
+		return baseContent.length > 0 ? baseContent : undefined
+	}
+}
+
+export async function storeNctSalt(keys: SignalKeyStoreWithTransaction, salt: Uint8Array | Buffer | null | undefined) {
+	await keys.set({
+		tctoken: {
+			[NCT_SALT_KEY]: salt?.length ? { nctSalt: Buffer.from(salt) } : null
+		}
+	})
+}
+
+export async function buildCsTokenFromStoredSalt({
+	authState,
+	meLid,
+	baseContent = []
+}: CsTokenParams): Promise<BinaryNode[] | undefined> {
+	try {
+		if (!meLid) return baseContent.length > 0 ? baseContent : undefined
+
+		const data = await authState.keys.get('tctoken', [NCT_SALT_KEY])
+		const nctSalt = data?.[NCT_SALT_KEY]?.nctSalt
+		if (!nctSalt?.length) return baseContent.length > 0 ? baseContent : undefined
+
+		baseContent.push({
+			tag: 'cstoken',
+			attrs: {},
+			content: hmacSign(Buffer.from(meLid), nctSalt)
+		})
+
+		return baseContent
+	} catch {
 		return baseContent.length > 0 ? baseContent : undefined
 	}
 }
