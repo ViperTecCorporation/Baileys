@@ -77,9 +77,10 @@ export type SignalDataTypeMap = {
     'lid-mapping': string;
     'device-list': string[];
     tctoken: {
-        token: Buffer;
+        token?: Buffer;
         timestamp?: string;
         senderTimestamp?: number;
+        nctSalt?: Buffer;
     };
     'identity-key': Uint8Array;
 };

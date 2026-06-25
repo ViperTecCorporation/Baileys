@@ -26806,6 +26806,7 @@ export const proto = $root.proto = (() => {
             HistorySyncConfig.prototype.supportGuestChat = null;
             HistorySyncConfig.prototype.completeOnDemandReady = null;
             HistorySyncConfig.prototype.thumbnailSyncDaysLimit = null;
+            HistorySyncConfig.prototype.supportInlineContacts = null;
 
             let $oneOfFields;
 
@@ -26923,6 +26924,12 @@ export const proto = $root.proto = (() => {
                 set: $util.oneOfSetter($oneOfFields)
             });
 
+            // Virtual OneOf for proto3 optional field
+            Object.defineProperty(HistorySyncConfig.prototype, "_supportInlineContacts", {
+                get: $util.oneOfGetter($oneOfFields = ["supportInlineContacts"]),
+                set: $util.oneOfSetter($oneOfFields)
+            });
+
             HistorySyncConfig.create = function create(properties) {
                 return new HistorySyncConfig(properties);
             };
@@ -26968,6 +26975,8 @@ export const proto = $root.proto = (() => {
                     w.uint32(144).bool(m.completeOnDemandReady);
                 if (m.thumbnailSyncDaysLimit != null && Object.hasOwnProperty.call(m, "thumbnailSyncDaysLimit"))
                     w.uint32(152).uint32(m.thumbnailSyncDaysLimit);
+                if (m.supportInlineContacts != null && Object.hasOwnProperty.call(m, "supportInlineContacts"))
+                    w.uint32(192).bool(m.supportInlineContacts);
                 return w;
             };
 
@@ -27056,6 +27065,10 @@ export const proto = $root.proto = (() => {
                             m.thumbnailSyncDaysLimit = r.uint32();
                             break;
                         }
+                    case 24: {
+                            m.supportInlineContacts = r.bool();
+                            break;
+                        }
                     default:
                         r.skipType(t & 7);
                         break;
@@ -27124,6 +27137,9 @@ export const proto = $root.proto = (() => {
                 }
                 if (d.thumbnailSyncDaysLimit != null) {
                     m.thumbnailSyncDaysLimit = d.thumbnailSyncDaysLimit >>> 0;
+                }
+                if (d.supportInlineContacts != null) {
+                    m.supportInlineContacts = Boolean(d.supportInlineContacts);
                 }
                 return m;
             };
@@ -27226,6 +27242,11 @@ export const proto = $root.proto = (() => {
                     d.thumbnailSyncDaysLimit = m.thumbnailSyncDaysLimit;
                     if (o.oneofs)
                         d._thumbnailSyncDaysLimit = "thumbnailSyncDaysLimit";
+                }
+                if (m.supportInlineContacts != null && m.hasOwnProperty("supportInlineContacts")) {
+                    d.supportInlineContacts = m.supportInlineContacts;
+                    if (o.oneofs)
+                        d._supportInlineContacts = "supportInlineContacts";
                 }
                 return d;
             };
@@ -30961,6 +30982,7 @@ export const proto = $root.proto = (() => {
             this.callLogRecords = [];
             this.phoneNumberToLidMappings = [];
             this.accounts = [];
+            this.inlineContacts = [];
             if (p)
                 for (var ks = Object.keys(p), i = 0; i < ks.length; ++i)
                     if (p[ks[i]] != null)
@@ -30984,6 +31006,9 @@ export const proto = $root.proto = (() => {
         HistorySync.prototype.companionMetaNonce = null;
         HistorySync.prototype.shareableChatIdentifierEncryptionKey = null;
         HistorySync.prototype.accounts = $util.emptyArray;
+        HistorySync.prototype.nctSalt = null;
+        HistorySync.prototype.inlineContacts = $util.emptyArray;
+        HistorySync.prototype.inlineContactsProvided = null;
 
         let $oneOfFields;
 
@@ -31032,6 +31057,18 @@ export const proto = $root.proto = (() => {
         // Virtual OneOf for proto3 optional field
         Object.defineProperty(HistorySync.prototype, "_shareableChatIdentifierEncryptionKey", {
             get: $util.oneOfGetter($oneOfFields = ["shareableChatIdentifierEncryptionKey"]),
+            set: $util.oneOfSetter($oneOfFields)
+        });
+
+        // Virtual OneOf for proto3 optional field
+        Object.defineProperty(HistorySync.prototype, "_nctSalt", {
+            get: $util.oneOfGetter($oneOfFields = ["nctSalt"]),
+            set: $util.oneOfSetter($oneOfFields)
+        });
+
+        // Virtual OneOf for proto3 optional field
+        Object.defineProperty(HistorySync.prototype, "_inlineContactsProvided", {
+            get: $util.oneOfGetter($oneOfFields = ["inlineContactsProvided"]),
             set: $util.oneOfSetter($oneOfFields)
         });
 
@@ -31092,6 +31129,14 @@ export const proto = $root.proto = (() => {
                 for (var i = 0; i < m.accounts.length; ++i)
                     $root.proto.Account.encode(m.accounts[i], w.uint32(146).fork()).ldelim();
             }
+            if (m.nctSalt != null && Object.hasOwnProperty.call(m, "nctSalt"))
+                w.uint32(154).bytes(m.nctSalt);
+            if (m.inlineContacts != null && m.inlineContacts.length) {
+                for (var i = 0; i < m.inlineContacts.length; ++i)
+                    $root.proto.InlineContact.encode(m.inlineContacts[i], w.uint32(162).fork()).ldelim();
+            }
+            if (m.inlineContactsProvided != null && Object.hasOwnProperty.call(m, "inlineContactsProvided"))
+                w.uint32(168).bool(m.inlineContactsProvided);
             return w;
         };
 
@@ -31186,6 +31231,20 @@ export const proto = $root.proto = (() => {
                         if (!(m.accounts && m.accounts.length))
                             m.accounts = [];
                         m.accounts.push($root.proto.Account.decode(r, r.uint32()));
+                        break;
+                    }
+                case 19: {
+                        m.nctSalt = r.bytes();
+                        break;
+                    }
+                case 20: {
+                        if (!(m.inlineContacts && m.inlineContacts.length))
+                            m.inlineContacts = [];
+                        m.inlineContacts.push($root.proto.InlineContact.decode(r, r.uint32()));
+                        break;
+                    }
+                case 21: {
+                        m.inlineContactsProvided = r.bool();
                         break;
                     }
                 default:
@@ -31361,6 +31420,25 @@ export const proto = $root.proto = (() => {
                     m.accounts[i] = $root.proto.Account.fromObject(d.accounts[i]);
                 }
             }
+            if (d.nctSalt != null) {
+                if (typeof d.nctSalt === "string")
+                    $util.base64.decode(d.nctSalt, m.nctSalt = $util.newBuffer($util.base64.length(d.nctSalt)), 0);
+                else if (d.nctSalt.length >= 0)
+                    m.nctSalt = d.nctSalt;
+            }
+            if (d.inlineContacts) {
+                if (!Array.isArray(d.inlineContacts))
+                    throw TypeError(".proto.HistorySync.inlineContacts: array expected");
+                m.inlineContacts = [];
+                for (var i = 0; i < d.inlineContacts.length; ++i) {
+                    if (typeof d.inlineContacts[i] !== "object")
+                        throw TypeError(".proto.HistorySync.inlineContacts: object expected");
+                    m.inlineContacts[i] = $root.proto.InlineContact.fromObject(d.inlineContacts[i]);
+                }
+            }
+            if (d.inlineContactsProvided != null) {
+                m.inlineContactsProvided = Boolean(d.inlineContactsProvided);
+            }
             return m;
         };
 
@@ -31377,6 +31455,7 @@ export const proto = $root.proto = (() => {
                 d.callLogRecords = [];
                 d.phoneNumberToLidMappings = [];
                 d.accounts = [];
+                d.inlineContacts = [];
             }
             if (o.defaults) {
                 d.syncType = o.enums === String ? "INITIAL_BOOTSTRAP" : 0;
@@ -31471,6 +31550,22 @@ export const proto = $root.proto = (() => {
                 for (var j = 0; j < m.accounts.length; ++j) {
                     d.accounts[j] = $root.proto.Account.toObject(m.accounts[j], o);
                 }
+            }
+            if (m.nctSalt != null && m.hasOwnProperty("nctSalt")) {
+                d.nctSalt = o.bytes === String ? $util.base64.encode(m.nctSalt, 0, m.nctSalt.length) : o.bytes === Array ? Array.prototype.slice.call(m.nctSalt) : m.nctSalt;
+                if (o.oneofs)
+                    d._nctSalt = "nctSalt";
+            }
+            if (m.inlineContacts && m.inlineContacts.length) {
+                d.inlineContacts = [];
+                for (var j = 0; j < m.inlineContacts.length; ++j) {
+                    d.inlineContacts[j] = $root.proto.InlineContact.toObject(m.inlineContacts[j], o);
+                }
+            }
+            if (m.inlineContactsProvided != null && m.hasOwnProperty("inlineContactsProvided")) {
+                d.inlineContactsProvided = m.inlineContactsProvided;
+                if (o.oneofs)
+                    d._inlineContactsProvided = "inlineContactsProvided";
             }
             return d;
         };
@@ -33101,6 +33196,178 @@ export const proto = $root.proto = (() => {
         })();
 
         return InThreadSurveyMetadata;
+    })();
+
+    proto.InlineContact = (function() {
+
+        function InlineContact(p) {
+            if (p)
+                for (var ks = Object.keys(p), i = 0; i < ks.length; ++i)
+                    if (p[ks[i]] != null)
+                        this[ks[i]] = p[ks[i]];
+        }
+
+        InlineContact.prototype.pnJid = null;
+        InlineContact.prototype.lidJid = null;
+        InlineContact.prototype.fullName = null;
+        InlineContact.prototype.firstName = null;
+        InlineContact.prototype.username = null;
+
+        let $oneOfFields;
+
+        // Virtual OneOf for proto3 optional field
+        Object.defineProperty(InlineContact.prototype, "_pnJid", {
+            get: $util.oneOfGetter($oneOfFields = ["pnJid"]),
+            set: $util.oneOfSetter($oneOfFields)
+        });
+
+        // Virtual OneOf for proto3 optional field
+        Object.defineProperty(InlineContact.prototype, "_lidJid", {
+            get: $util.oneOfGetter($oneOfFields = ["lidJid"]),
+            set: $util.oneOfSetter($oneOfFields)
+        });
+
+        // Virtual OneOf for proto3 optional field
+        Object.defineProperty(InlineContact.prototype, "_fullName", {
+            get: $util.oneOfGetter($oneOfFields = ["fullName"]),
+            set: $util.oneOfSetter($oneOfFields)
+        });
+
+        // Virtual OneOf for proto3 optional field
+        Object.defineProperty(InlineContact.prototype, "_firstName", {
+            get: $util.oneOfGetter($oneOfFields = ["firstName"]),
+            set: $util.oneOfSetter($oneOfFields)
+        });
+
+        // Virtual OneOf for proto3 optional field
+        Object.defineProperty(InlineContact.prototype, "_username", {
+            get: $util.oneOfGetter($oneOfFields = ["username"]),
+            set: $util.oneOfSetter($oneOfFields)
+        });
+
+        InlineContact.create = function create(properties) {
+            return new InlineContact(properties);
+        };
+
+        InlineContact.encode = function encode(m, w) {
+            if (!w)
+                w = $Writer.create();
+            if (m.pnJid != null && Object.hasOwnProperty.call(m, "pnJid"))
+                w.uint32(10).string(m.pnJid);
+            if (m.lidJid != null && Object.hasOwnProperty.call(m, "lidJid"))
+                w.uint32(18).string(m.lidJid);
+            if (m.fullName != null && Object.hasOwnProperty.call(m, "fullName"))
+                w.uint32(26).string(m.fullName);
+            if (m.firstName != null && Object.hasOwnProperty.call(m, "firstName"))
+                w.uint32(34).string(m.firstName);
+            if (m.username != null && Object.hasOwnProperty.call(m, "username"))
+                w.uint32(42).string(m.username);
+            return w;
+        };
+
+        InlineContact.decode = function decode(r, l, e) {
+            if (!(r instanceof $Reader))
+                r = $Reader.create(r);
+            var c = l === undefined ? r.len : r.pos + l, m = new $root.proto.InlineContact();
+            while (r.pos < c) {
+                var t = r.uint32();
+                if (t === e)
+                    break;
+                switch (t >>> 3) {
+                case 1: {
+                        m.pnJid = r.string();
+                        break;
+                    }
+                case 2: {
+                        m.lidJid = r.string();
+                        break;
+                    }
+                case 3: {
+                        m.fullName = r.string();
+                        break;
+                    }
+                case 4: {
+                        m.firstName = r.string();
+                        break;
+                    }
+                case 5: {
+                        m.username = r.string();
+                        break;
+                    }
+                default:
+                    r.skipType(t & 7);
+                    break;
+                }
+            }
+            return m;
+        };
+
+        InlineContact.fromObject = function fromObject(d) {
+            if (d instanceof $root.proto.InlineContact)
+                return d;
+            var m = new $root.proto.InlineContact();
+            if (d.pnJid != null) {
+                m.pnJid = String(d.pnJid);
+            }
+            if (d.lidJid != null) {
+                m.lidJid = String(d.lidJid);
+            }
+            if (d.fullName != null) {
+                m.fullName = String(d.fullName);
+            }
+            if (d.firstName != null) {
+                m.firstName = String(d.firstName);
+            }
+            if (d.username != null) {
+                m.username = String(d.username);
+            }
+            return m;
+        };
+
+        InlineContact.toObject = function toObject(m, o) {
+            if (!o)
+                o = {};
+            var d = {};
+            if (m.pnJid != null && m.hasOwnProperty("pnJid")) {
+                d.pnJid = m.pnJid;
+                if (o.oneofs)
+                    d._pnJid = "pnJid";
+            }
+            if (m.lidJid != null && m.hasOwnProperty("lidJid")) {
+                d.lidJid = m.lidJid;
+                if (o.oneofs)
+                    d._lidJid = "lidJid";
+            }
+            if (m.fullName != null && m.hasOwnProperty("fullName")) {
+                d.fullName = m.fullName;
+                if (o.oneofs)
+                    d._fullName = "fullName";
+            }
+            if (m.firstName != null && m.hasOwnProperty("firstName")) {
+                d.firstName = m.firstName;
+                if (o.oneofs)
+                    d._firstName = "firstName";
+            }
+            if (m.username != null && m.hasOwnProperty("username")) {
+                d.username = m.username;
+                if (o.oneofs)
+                    d._username = "username";
+            }
+            return d;
+        };
+
+        InlineContact.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        InlineContact.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/proto.InlineContact";
+        };
+
+        return InlineContact;
     })();
 
     proto.InteractiveAnnotation = (function() {
@@ -79685,6 +79952,7 @@ export const proto = $root.proto = (() => {
         SyncActionValue.prototype.newsletterSavedInterestsAction = null;
         SyncActionValue.prototype.aiThreadRenameAction = null;
         SyncActionValue.prototype.interactiveMessageAction = null;
+        SyncActionValue.prototype.nctSaltSyncAction = null;
 
         let $oneOfFields;
 
@@ -80102,6 +80370,12 @@ export const proto = $root.proto = (() => {
             set: $util.oneOfSetter($oneOfFields)
         });
 
+        // Virtual OneOf for proto3 optional field
+        Object.defineProperty(SyncActionValue.prototype, "_nctSaltSyncAction", {
+            get: $util.oneOfGetter($oneOfFields = ["nctSaltSyncAction"]),
+            set: $util.oneOfSetter($oneOfFields)
+        });
+
         SyncActionValue.create = function create(properties) {
             return new SyncActionValue(properties);
         };
@@ -80247,6 +80521,8 @@ export const proto = $root.proto = (() => {
                 $root.proto.SyncActionValue.AiThreadRenameAction.encode(m.aiThreadRenameAction, w.uint32(610).fork()).ldelim();
             if (m.interactiveMessageAction != null && Object.hasOwnProperty.call(m, "interactiveMessageAction"))
                 $root.proto.SyncActionValue.InteractiveMessageAction.encode(m.interactiveMessageAction, w.uint32(618).fork()).ldelim();
+            if (m.nctSaltSyncAction != null && Object.hasOwnProperty.call(m, "nctSaltSyncAction"))
+                $root.proto.SyncActionValue.NctSaltSyncAction.encode(m.nctSaltSyncAction, w.uint32(642).fork()).ldelim();
             return w;
         };
 
@@ -80533,6 +80809,10 @@ export const proto = $root.proto = (() => {
                     }
                 case 77: {
                         m.interactiveMessageAction = $root.proto.SyncActionValue.InteractiveMessageAction.decode(r, r.uint32());
+                        break;
+                    }
+                case 80: {
+                        m.nctSaltSyncAction = $root.proto.SyncActionValue.NctSaltSyncAction.decode(r, r.uint32());
                         break;
                     }
                 default:
@@ -80897,6 +81177,11 @@ export const proto = $root.proto = (() => {
                     throw TypeError(".proto.SyncActionValue.interactiveMessageAction: object expected");
                 m.interactiveMessageAction = $root.proto.SyncActionValue.InteractiveMessageAction.fromObject(d.interactiveMessageAction);
             }
+            if (d.nctSaltSyncAction != null) {
+                if (typeof d.nctSaltSyncAction !== "object")
+                    throw TypeError(".proto.SyncActionValue.nctSaltSyncAction: object expected");
+                m.nctSaltSyncAction = $root.proto.SyncActionValue.NctSaltSyncAction.fromObject(d.nctSaltSyncAction);
+            }
             return m;
         };
 
@@ -81251,6 +81536,11 @@ export const proto = $root.proto = (() => {
                 d.interactiveMessageAction = $root.proto.SyncActionValue.InteractiveMessageAction.toObject(m.interactiveMessageAction, o);
                 if (o.oneofs)
                     d._interactiveMessageAction = "interactiveMessageAction";
+            }
+            if (m.nctSaltSyncAction != null && m.hasOwnProperty("nctSaltSyncAction")) {
+                d.nctSaltSyncAction = $root.proto.SyncActionValue.NctSaltSyncAction.toObject(m.nctSaltSyncAction, o);
+                if (o.oneofs)
+                    d._nctSaltSyncAction = "nctSaltSyncAction";
             }
             return d;
         };
@@ -85980,6 +86270,97 @@ export const proto = $root.proto = (() => {
             };
 
             return NewsletterSavedInterestsAction;
+        })();
+
+        SyncActionValue.NctSaltSyncAction = (function() {
+
+            function NctSaltSyncAction(p) {
+                if (p)
+                    for (var ks = Object.keys(p), i = 0; i < ks.length; ++i)
+                        if (p[ks[i]] != null)
+                            this[ks[i]] = p[ks[i]];
+            }
+
+            NctSaltSyncAction.prototype.salt = null;
+
+            let $oneOfFields;
+
+            // Virtual OneOf for proto3 optional field
+            Object.defineProperty(NctSaltSyncAction.prototype, "_salt", {
+                get: $util.oneOfGetter($oneOfFields = ["salt"]),
+                set: $util.oneOfSetter($oneOfFields)
+            });
+
+            NctSaltSyncAction.create = function create(properties) {
+                return new NctSaltSyncAction(properties);
+            };
+
+            NctSaltSyncAction.encode = function encode(m, w) {
+                if (!w)
+                    w = $Writer.create();
+                if (m.salt != null && Object.hasOwnProperty.call(m, "salt"))
+                    w.uint32(10).bytes(m.salt);
+                return w;
+            };
+
+            NctSaltSyncAction.decode = function decode(r, l, e) {
+                if (!(r instanceof $Reader))
+                    r = $Reader.create(r);
+                var c = l === undefined ? r.len : r.pos + l, m = new $root.proto.SyncActionValue.NctSaltSyncAction();
+                while (r.pos < c) {
+                    var t = r.uint32();
+                    if (t === e)
+                        break;
+                    switch (t >>> 3) {
+                    case 1: {
+                            m.salt = r.bytes();
+                            break;
+                        }
+                    default:
+                        r.skipType(t & 7);
+                        break;
+                    }
+                }
+                return m;
+            };
+
+            NctSaltSyncAction.fromObject = function fromObject(d) {
+                if (d instanceof $root.proto.SyncActionValue.NctSaltSyncAction)
+                    return d;
+                var m = new $root.proto.SyncActionValue.NctSaltSyncAction();
+                if (d.salt != null) {
+                    if (typeof d.salt === "string")
+                        $util.base64.decode(d.salt, m.salt = $util.newBuffer($util.base64.length(d.salt)), 0);
+                    else if (d.salt.length >= 0)
+                        m.salt = d.salt;
+                }
+                return m;
+            };
+
+            NctSaltSyncAction.toObject = function toObject(m, o) {
+                if (!o)
+                    o = {};
+                var d = {};
+                if (m.salt != null && m.hasOwnProperty("salt")) {
+                    d.salt = o.bytes === String ? $util.base64.encode(m.salt, 0, m.salt.length) : o.bytes === Array ? Array.prototype.slice.call(m.salt) : m.salt;
+                    if (o.oneofs)
+                        d._salt = "salt";
+                }
+                return d;
+            };
+
+            NctSaltSyncAction.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            NctSaltSyncAction.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/proto.SyncActionValue.NctSaltSyncAction";
+            };
+
+            return NctSaltSyncAction;
         })();
 
         SyncActionValue.NoteEditAction = (function() {

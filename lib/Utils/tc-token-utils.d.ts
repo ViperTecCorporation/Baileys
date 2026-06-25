@@ -40,7 +40,16 @@ type TcTokenParams = {
     };
     getLIDForPN?: (pn: string) => Promise<string | null>;
 };
+type CsTokenParams = {
+    baseContent?: BinaryNode[];
+    authState: {
+        keys: SignalKeyStoreWithTransaction;
+    };
+    meLid?: string;
+};
 export declare function buildTcTokenFromJid({ authState, jid, baseContent, getLIDForPN }: TcTokenParams): Promise<BinaryNode[] | undefined>;
+export declare function storeNctSalt(keys: SignalKeyStoreWithTransaction, salt: Uint8Array | Buffer | null | undefined): Promise<void>;
+export declare function buildCsTokenFromStoredSalt({ authState, meLid, baseContent }: CsTokenParams): Promise<BinaryNode[] | undefined>;
 type StoreTcTokensParams = {
     result: BinaryNode;
     fallbackJid: string;

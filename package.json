@@ -136,7 +136,7 @@
   },
   "baileysGitBuild": {
     "sourceBranch": "addbuttonsupport",
-    "sourceCommit": "03083bc2b6622120da4fc7756a2e414580956773",
-    "builtAt": "2026-05-31T23:26:39.170Z"
+    "sourceCommit": "094a22f2e0c8d6435734b2a8763190232d0b8d9a",
+    "builtAt": "2026-06-25T04:27:32.634Z"
   }
 }
