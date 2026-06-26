@@ -1,4 +1,4 @@
-import type { LIDMapping, SignalKeyStoreWithTransaction } from '../Types/index.js';
+import type { LIDMapping, SignalKeyStoreWithTransaction, OptionsWithForce } from '../Types/index.js';
 import type { ILogger } from '../Utils/logger.js';
 export declare class LIDMappingStore {
     private readonly mappingCache;
@@ -9,8 +9,9 @@ export declare class LIDMappingStore {
     private readonly inflightPNLookups;
     constructor(keys: SignalKeyStoreWithTransaction, logger: ILogger, pnToLIDFunc?: (jids: string[]) => Promise<LIDMapping[] | undefined>);
     storeLIDPNMappings(pairs: LIDMapping[]): Promise<void>;
-    getLIDForPN(pn: string): Promise<string | null>;
-    getLIDsForPNs(pns: string[]): Promise<LIDMapping[] | null>;
+    invalidateLIDPNMapping(pn?: string, lid?: string): Promise<void>;
+    getLIDForPN(pn: string, options?: OptionsWithForce & {}): Promise<string | null>;
+    getLIDsForPNs(pns: string[], { force }?: OptionsWithForce & {}): Promise<LIDMapping[] | null>;
     private _getLIDsForPNsImpl;
     getPNForLID(lid: string): Promise<string | null>;
     getPNsForLIDs(lids: string[]): Promise<LIDMapping[] | null>;

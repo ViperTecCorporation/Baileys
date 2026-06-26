@@ -64,4 +64,7 @@ export type CurveKeyPair = {
     private: Uint8Array;
     public: Uint8Array;
 };
+export type OptionsWithForce = {
+    force?: boolean;
+};
 //# sourceMappingURL=index.d.ts.map
