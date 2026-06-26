@@ -109,6 +109,12 @@ export type SocketConfig = {
 	/** Enable recent message caching for retry handling */
 	enableRecentMessageCache: boolean
 
+	/** Handle ACKs with 'refresh_lid': 'true', emit 'lid-migration.update' */
+	enableLidMigrationSafety: boolean
+
+	/** Force-refresh PN-->LID mappings when a refresh_lid ACK is received */
+	refreshMappingOnLidMigration: boolean
+
 	/**
 	 * Returns if a jid should be ignored,
 	 * no event for that jid will be triggered.

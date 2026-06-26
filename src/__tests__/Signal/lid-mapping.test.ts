@@ -44,4 +44,57 @@ describe('LIDMappingStore', () => {
 			expect(result).toBeNull()
 		})
 	})
+
+	describe('getLIDsForPNs', () => {
+		it('force refreshes a PN mapping through USync instead of using cache or storage', async () => {
+			const pn = '12345678900@s.whatsapp.net'
+			const oldLid = '11111111111111@lid'
+			const newLid = '22222222222222@lid'
+
+			// @ts-ignore
+			mockKeys.get.mockResolvedValue({} as SignalDataTypeMap['lid-mapping'])
+
+			await lidMappingStore.storeLIDPNMappings([{ pn: pn, lid: oldLid }])
+
+			jest.clearAllMocks()
+			mockPnToLIDFunc.mockResolvedValue([{ pn: pn, lid: newLid }])
+
+			const result = await lidMappingStore.getLIDsForPNs([ pn ], { force: true })
+
+			expect(mockKeys.get).not.toHaveBeenCalled()
+			expect(mockPnToLIDFunc).toHaveBeenCalledWith([ pn ])
+			expect(mockKeys.set).toHaveBeenCalledWith({
+				'lid-mapping': {
+					'12345678900': '22222222222222',
+					'22222222222222_reverse': '12345678900'
+				}
+			})
+			expect(result).toEqual([{ pn: pn, lid: newLid }])
+		})
+
+		it('invalidates a stale PN and LID mapping before later lookups', async () => {
+			const pn = '12345678900@s.whatsapp.net'
+			const oldLid = '11111111111111@lid'
+
+			// @ts-ignore
+			mockKeys.get.mockResolvedValue({} as SignalDataTypeMap['lid-mapping'])
+
+			await lidMappingStore.storeLIDPNMappings([{ pn: pn, lid: oldLid }])
+
+			jest.clearAllMocks()
+			mockPnToLIDFunc.mockResolvedValue(undefined)
+
+			await lidMappingStore.invalidateLIDPNMapping(pn, oldLid)
+			const result = await lidMappingStore.getLIDsForPNs([pn])
+
+			expect(mockKeys.set).toHaveBeenCalledWith({
+				'lid-mapping': {
+					'12345678900': null,
+					'11111111111111_reverse': null
+				}
+			})
+			expect(mockPnToLIDFunc).toHaveBeenCalledWith([pn])
+			expect(result).toBeNull()
+		})
+	})
 })

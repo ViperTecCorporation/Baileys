@@ -1,5 +1,5 @@
 import { LRUCache } from 'lru-cache'
-import type { LIDMapping, SignalKeyStoreWithTransaction } from '../Types'
+import type { LIDMapping, SignalKeyStoreWithTransaction, OptionsWithForce } from '../Types'
 import type { ILogger } from '../Utils/logger'
 import { isHostedPnUser, isLidUser, isPnUser, jidDecode, jidNormalizedUser, WAJIDDomains } from '../WABinary'
 
@@ -105,15 +105,37 @@ export class LIDMappingStore {
 		}
 	}
 
-	async getLIDForPN(pn: string): Promise<string | null> {
-		return (await this.getLIDsForPNs([pn]))?.[0]?.lid || null
+	async invalidateLIDPNMapping(pn?: string, lid?: string): Promise<void> {
+		const pnUser = pn ? jidDecode(pn)?.user : undefined
+		const lidUser = lid ? jidDecode(lid)?.user : undefined
+		if (!pnUser && !lidUser) return
+
+		const batchData: { [key: string]: string | null } = {}
+		if (pnUser) {
+			batchData[pnUser] = null
+			this.mappingCache.delete(`pn:${pnUser}`)
+		}
+
+		if (lidUser) {
+			batchData[`${lidUser}_reverse`] = null
+			this.mappingCache.delete(`lid:${lidUser}`)
+		}
+
+		await this.keys.transaction(async () => {
+			await this.keys.set({ 'lid-mapping': batchData })
+		}, 'lid-mapping')
 	}
 
-	async getLIDsForPNs(pns: string[]): Promise<LIDMapping[] | null> {
+	async getLIDForPN(pn: string, options: OptionsWithForce & {} = {}): Promise<string | null> {
+		return (await this.getLIDsForPNs([pn], options))?.[0]?.lid || null
+	}
+
+	async getLIDsForPNs(pns: string[], { force }: OptionsWithForce & {} = {}): Promise<LIDMapping[] | null> {
 		if (pns.length === 0) return null
 
 		const sortedPns = [...new Set(pns)].sort()
-		const cacheKey = sortedPns.join(',')
+		const forceCachePrefix = 'force'
+		const cacheKey = `${force ? `${forceCachePrefix}:` : ''}${sortedPns.join(',')}`
 
 		const inflight = this.inflightLIDLookups.get(cacheKey)
 		if (inflight) {
@@ -121,7 +143,7 @@ export class LIDMappingStore {
 			return inflight
 		}
 
-		const promise = this._getLIDsForPNsImpl(pns)
+		const promise = this._getLIDsForPNsImpl(pns, { force })
 		this.inflightLIDLookups.set(cacheKey, promise)
 
 		try {
@@ -131,7 +153,7 @@ export class LIDMappingStore {
 		}
 	}
 
-	private async _getLIDsForPNsImpl(pns: string[]): Promise<LIDMapping[] | null> {
+	private async _getLIDsForPNsImpl(pns: string[], { force }: OptionsWithForce & {}): Promise<LIDMapping[] | null> {
 		const usyncFetch: { [_: string]: number[] } = {}
 		const successfulPairs: { [_: string]: LIDMapping } = {}
 		const pending: Array<{ pn: string; pnUser: string; decoded: ReturnType<typeof jidDecode> }> = []
@@ -161,7 +183,10 @@ export class LIDMappingStore {
 			if (!decoded) continue
 
 			const pnUser = decoded.user
-			const cached = this.mappingCache.get(`pn:${pnUser}`)
+			const cached = force ?
+				undefined :
+				this.mappingCache.get(`pn:${pnUser}`)
+
 			if (cached && typeof cached === 'string') {
 				if (!addResolvedPair(pn, decoded, cached)) {
 					this.logger.warn(`Invalid entry for ${pn} (pair not resolved)`)
@@ -176,17 +201,22 @@ export class LIDMappingStore {
 
 		if (pending.length) {
 			const pnUsers = [...new Set(pending.map(item => item.pnUser))]
-			const stored = await this.keys.get('lid-mapping', pnUsers)
-			for (const pnUser of pnUsers) {
-				const lidUser = stored[pnUser]
-				if (lidUser && typeof lidUser === 'string') {
-					this.mappingCache.set(`pn:${pnUser}`, lidUser)
-					this.mappingCache.set(`lid:${lidUser}`, pnUser)
+			if (!force) {
+				const stored = await this.keys.get('lid-mapping', pnUsers)
+				for (const pnUser of pnUsers) {
+					const lidUser = stored[pnUser]
+					if (lidUser && typeof lidUser === 'string') {
+						this.mappingCache.set(`pn:${pnUser}`, lidUser)
+						this.mappingCache.set(`lid:${lidUser}`, pnUser)
+					}
 				}
 			}
 
 			for (const { pn, pnUser, decoded } of pending) {
-				const cached = this.mappingCache.get(`pn:${pnUser}`)
+				const cached = force ?
+					undefined :
+					this.mappingCache.get(`pn:${pnUser}`)
+
 				if (cached && typeof cached === 'string') {
 					if (!addResolvedPair(pn, decoded, cached)) {
 						this.logger.warn(`Invalid entry for ${pn} (pair not resolved)`)

@@ -24,6 +24,14 @@ export type LIDMapping = {
 	lid: string
 }
 
+export type LIDMigrationUpdate = {
+	oldLid: string
+	newLid?: string
+	pn?: string
+	messageId?: string
+	reason: 'ack-refresh-lid'
+}
+
 export type LTHashState = {
 	version: number
 	hash: Buffer
