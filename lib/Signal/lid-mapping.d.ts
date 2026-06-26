@@ -11,6 +11,7 @@ export declare class LIDMappingStore {
     storeLIDPNMappings(pairs: LIDMapping[]): Promise<void>;
     invalidateLIDPNMapping(pn?: string, lid?: string): Promise<void>;
     getLIDForPN(pn: string, options?: OptionsWithForce & {}): Promise<string | null>;
+    getKnownLIDForPN(pn: string): Promise<string | null>;
     getLIDsForPNs(pns: string[], { force }?: OptionsWithForce & {}): Promise<LIDMapping[] | null>;
     private _getLIDsForPNsImpl;
     getPNForLID(lid: string): Promise<string | null>;
