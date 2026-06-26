@@ -674,8 +674,9 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		}
 
 		await authState.keys.transaction(async () => {
+			const shouldUseBizTextEnvelope = shouldIncludeBizBinaryNode(message)
 			const mediaType = getMediaType(message)
-			if (mediaType) {
+			if (mediaType && !shouldUseBizTextEnvelope) {
 				extraAttrs['mediatype'] = mediaType
 			}
 
@@ -1024,7 +1025,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				attrs: {
 					id: msgId,
 					to: destinationJid,
-					type: getMessageType(message),
+					type: shouldUseBizTextEnvelope ? 'text' : getMessageType(message),
 					...(additionalAttributes || {})
 				},
 				content: binaryNodeContent
@@ -1093,6 +1094,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			const isPeerMessage = additionalAttributes?.['category'] === 'peer'
 			const is1on1Send = !isGroup && !isStatus && !isNewsletter && !isPeerMessage
 			let didFetchTcToken = false
+			let privacyTokenNodeTag: 'tctoken' | 'cstoken' | undefined
 
 			// Resolve destination to LID for tctoken storage — matches Signal session key pattern
 			const tcTokenJid = is1on1Send ? await resolveTcTokenJid(destinationJid, getLIDForPN) : destinationJid
@@ -1173,6 +1175,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					attrs: {},
 					content: tcTokenBuffer
 				})
+				privacyTokenNodeTag = 'tctoken'
 			} else if (is1on1Send) {
 				const csTokenContent = await buildCsTokenFromStoredSalt({
 					authState,
@@ -1180,6 +1183,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				})
 				if (csTokenContent?.length) {
 					;(stanza.content as BinaryNode[]).push(...csTokenContent)
+					privacyTokenNodeTag = 'cstoken'
 					logger.debug({ jid: destinationJid }, 'attached cstoken fallback to 1:1 message')
 				}
 			}
@@ -1199,6 +1203,10 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					{
 						jid,
 						msgId,
+						stanzaType: stanza.attrs.type,
+						encMediaType: extraAttrs['mediatype'],
+						bizTextEnvelope: shouldUseBizTextEnvelope,
+						privacyTokenNodeTag,
 						hasMessageContextInfo: !!innerMessage.messageContextInfo,
 						reportingTokenAdded
 					},
