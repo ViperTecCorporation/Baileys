@@ -78,6 +78,9 @@ export type SignalRepository = {
         reason?: string;
     }>;
     deleteSession(jids: string[]): Promise<void>;
+    /** Delete the session for `jid` under the per-session lock so it can't
+     *  race with concurrent encrypt/decrypt on the same recipient. */
+    deleteSessionForJid(jid: string): Promise<void>;
 };
 export interface SignalRepositoryWithLIDStore extends SignalRepository {
     lidMapping: LIDMappingStore;

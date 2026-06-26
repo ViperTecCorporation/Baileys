@@ -1,5 +1,5 @@
 # Baileys Git Build
 
 Source branch: addbuttonsupport
-Source commit: 535e7e7c03f9446aa646611286d8703b70546004
-Built at: 2026-06-26T14:07:43Z
+Source commit: 41cd50934a82b6ebea76be5745b845035a452332
+Built at: 2026-06-26T14:33:58Z
