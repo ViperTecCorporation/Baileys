@@ -100,4 +100,30 @@ describe('LIDMappingStore', () => {
 			expect(result).toBeNull()
 		})
 	})
+
+	describe('getKnownLIDForPN', () => {
+		it('returns a stored LID without triggering USync', async () => {
+			const pn = '12345678900@s.whatsapp.net'
+
+			// @ts-ignore
+			mockKeys.get.mockResolvedValue({ '12345678900': '22222222222222' } as SignalDataTypeMap['lid-mapping'])
+
+			const result = await lidMappingStore.getKnownLIDForPN(pn)
+
+			expect(mockPnToLIDFunc).not.toHaveBeenCalled()
+			expect(result).toBe('22222222222222@lid')
+		})
+
+		it('ignores invalid stored LID values', async () => {
+			const pn = '12345678900@s.whatsapp.net'
+
+			// @ts-ignore
+			mockKeys.get.mockResolvedValue({ '12345678900': {} } as SignalDataTypeMap['lid-mapping'])
+
+			const result = await lidMappingStore.getKnownLIDForPN(pn)
+
+			expect(mockPnToLIDFunc).not.toHaveBeenCalled()
+			expect(result).toBeNull()
+		})
+	})
 })
