@@ -7,7 +7,8 @@ import {
 	buildTcTokenFromJid,
 	isTcTokenExpired,
 	shouldSendNewTcToken,
-	storeNctSalt
+	storeNctSalt,
+	storeTcTokensFromIqResult
 } from '../../Utils/tc-token-utils'
 import type { BinaryNode } from '../../WABinary'
 
@@ -579,6 +580,52 @@ describe('tctoken integration scenarios', () => {
 	})
 
 	describe('senderTimestamp preservation on token update', () => {
+		it('storeTcTokensFromIqResult reports stored token details', async () => {
+			const token = Buffer.from([1, 2, 3])
+			const resultNode: BinaryNode = {
+				tag: 'iq',
+				attrs: {},
+				content: [
+					{
+						tag: 'tokens',
+						attrs: {},
+						content: [
+							{
+								tag: 'token',
+								attrs: { jid: JID_A, t: '1770920492', type: 'trusted_contact' },
+								content: token
+							}
+						]
+					}
+				]
+			}
+			// @ts-ignore
+			mockKeys.get.mockResolvedValue({})
+
+			const summary = await storeTcTokensFromIqResult({
+				result: resultNode,
+				fallbackJid: JID_A,
+				keys: mockKeys,
+				getLIDForPN: async () => null
+			})
+
+			expect(summary).toEqual({
+				tokensNodeFound: true,
+				tokenNodes: 1,
+				stored: 1,
+				skipped: 0,
+				storedJids: [JID_A]
+			})
+			expect(mockKeys.set).toHaveBeenCalledWith({
+				tctoken: {
+					[JID_A]: {
+						token,
+						timestamp: '1770920492'
+					}
+				}
+			})
+		})
+
 		it('simulates notification handler preserving senderTimestamp via spread', () => {
 			// This tests the pattern: { ...existing, token, timestamp }
 			// which preserves senderTimestamp from the existing entry

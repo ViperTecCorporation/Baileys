@@ -407,6 +407,20 @@ const processMessage = async (
 					}
 
 					const data = await downloadAndProcessHistorySyncNotification(histNotification, options, logger)
+					logger?.info(
+						{
+							syncType: data.syncType,
+							syncTypeName:
+								typeof data.syncType === 'number'
+									? proto.HistorySync.HistorySyncType[data.syncType] || `${data.syncType}`
+									: `${data.syncType || 'unknown'}`,
+							progress: data.progress,
+							tcTokens: data.tcTokens?.length || 0,
+							nctSaltBytes: data.nctSalt?.length || 0,
+							lidPnMappings: data.lidPnMappings?.length || 0
+						},
+						'processed history sync privacy payloads'
+					)
 
 					if (data.lidPnMappings?.length) {
 						logger?.debug({ count: data.lidPnMappings.length }, 'processing LID-PN mappings from history sync')
@@ -443,10 +457,12 @@ const processMessage = async (
 					if (data.nctSalt?.length) {
 						try {
 							await storeNctSalt(keyStore, data.nctSalt)
-							logger?.debug('stored nct salt from history sync')
+							logger?.info({ saltBytes: data.nctSalt.length }, 'stored nct salt from history sync')
 						} catch (err) {
 							logger?.warn({ err }, 'failed to store nct salt from history sync')
 						}
+					} else {
+						logger?.debug({ syncType: data.syncType, progress: data.progress }, 'history sync without nct salt')
 					}
 
 					ev.emit('messaging-history.set', {

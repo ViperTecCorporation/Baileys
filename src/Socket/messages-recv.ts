@@ -137,6 +137,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		registerSocketEndHandler,
 		issuePrivacyTokens,
 		fetchAccountReachoutTimelock,
+		fetchNewChatMessageCap,
 		getPrivacyTokens
 	} = sock
 
@@ -2010,17 +2011,19 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		// device could not display the message
 		if (attrs.error) {
 			const isReachoutTimelocked = attrs.error === String(NACK_REASONS.SenderReachoutTimelocked)
+			let errorDetails: any
 
 			if (attrs.error === SERVER_ERROR_CODES.MessageAccountRestriction) {
 				// 463 = 1:1 message missing privacy token (tctoken). Usually means the
 				// account is restricted: WhatsApp blocks starting new chats but preserves
 				// existing ones, since established chats already carry a tctoken.
 				// WA Web prevents this client-side (disables the compose bar).
-				// No retry — retrying counts as another "reach out" and worsens the restriction.
+				// No retry: retrying counts as another reach out and worsens the restriction.
 				logger.warn(
 					{ msgId: attrs.id, from: attrs.from },
 					'error 463: account restricted or missing tctoken for contact'
 				)
+				errorDetails = await logMexRestrictionDiagnostics(attrs.from, attrs.id)
 
 				const ackFrom = attrs.from
 				if (ackFrom && !inFlight463Recoveries.has(ackFrom)) {
@@ -2036,14 +2039,25 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 								getPNForLID
 							)
 							const result = await issuePrivacyTokens([issueJid], unixTimestampSeconds())
-							await storeTcTokensFromIqResult({
+							const storeResult = await storeTcTokensFromIqResult({
 								result,
 								fallbackJid: tcStorageJid,
 								keys: authState.keys,
 								getLIDForPN,
 								onNewJidStored: trackTcTokenJid
 							})
-							logger.debug({ from: ackFrom }, 'completed 463 token recovery issuance')
+							logger.debug(
+								{
+									from: ackFrom,
+									issueJid,
+									tcStorageJid,
+									stored: storeResult.stored,
+									tokenNodes: storeResult.tokenNodes,
+									tokensNodeFound: storeResult.tokensNodeFound,
+									storedJids: storeResult.storedJids
+								},
+								'completed 463 token recovery issuance'
+							)
 						} catch (err: any) {
 							logger.debug({ from: ackFrom, err: err?.message }, 'failed 463 token recovery issuance')
 						} finally {
@@ -2069,11 +2083,45 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 					key,
 					update: {
 						status: WAMessageStatus.ERROR,
-						messageStubParameters: isReachoutTimelocked ? [attrs.error, ACCOUNT_RESTRICTED_TEXT] : [attrs.error]
-					}
+						messageStubParameters: isReachoutTimelocked ? [attrs.error, ACCOUNT_RESTRICTED_TEXT] : [attrs.error],
+						error: errorDetails
+					} as any
 				}
 			])
 		}
+	}
+
+	const logMexRestrictionDiagnostics = async (from?: string, msgId?: string) => {
+		const [reachoutResult, capResult] = await Promise.allSettled([
+			fetchAccountReachoutTimelock(),
+			fetchNewChatMessageCap()
+		])
+
+		const reachout = reachoutResult.status === 'fulfilled' ? reachoutResult.value : undefined
+		const capping = capResult.status === 'fulfilled' ? capResult.value : undefined
+
+		const diagnostics = {
+			code: Number(SERVER_ERROR_CODES.MessageAccountRestriction),
+			title: 'Account restricted for companion or missing tctoken',
+			message: ACCOUNT_RESTRICTED_TEXT,
+			error_data: {
+				reason: 'message_account_restriction',
+				from,
+				msgId,
+				reachout,
+				capping,
+				reachoutError:
+					reachoutResult.status === 'rejected'
+						? reachoutResult.reason?.message || String(reachoutResult.reason)
+						: undefined,
+				cappingError:
+					capResult.status === 'rejected'
+						? capResult.reason?.message || String(capResult.reason)
+						: undefined
+			}
+		}
+		logger.warn(diagnostics, '463 MEX restriction diagnostics')
+		return diagnostics
 	}
 
 	/// processes a node with the given function

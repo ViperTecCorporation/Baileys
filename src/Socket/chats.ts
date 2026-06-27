@@ -541,7 +541,22 @@ export const makeChatsSocket = (config: SocketConfig) => {
 					isInitialSync ? { accountSettings: authState.creds.accountSettings } : undefined,
 					logger,
 					{
-						onNctSalt: salt => storeNctSalt(authState.keys, salt)
+						onNctSalt: async salt => {
+							const saltBytes = salt?.length || 0
+							try {
+								await storeNctSalt(authState.keys, salt)
+								logger.info(
+									{ saltBytes, removed: !saltBytes },
+									'persisted nct salt from app state'
+								)
+							} catch (err: any) {
+								logger.warn(
+									{ saltBytes, removed: !saltBytes, err: err?.message || String(err) },
+									'failed to persist nct salt from app state'
+								)
+								throw err
+							}
+						}
 					}
 				)
 			}

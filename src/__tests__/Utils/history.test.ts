@@ -96,6 +96,41 @@ describe('processHistoryMessage', () => {
 	})
 
 	describe('conversations processing', () => {
+		it('should extract privacy token data from NON_BLOCKING_DATA history chunks', () => {
+			const nctSalt = Buffer.from('nct-salt')
+			const tcToken = Buffer.from('tc-token')
+			const historySync: proto.IHistorySync = {
+				syncType: proto.HistorySync.HistorySyncType.NON_BLOCKING_DATA,
+				nctSalt,
+				conversations: [
+					{
+						id: '1234567890123@s.whatsapp.net',
+						lidJid: '11111111111111@lid',
+						pnJid: '1234567890123@s.whatsapp.net',
+						tcToken,
+						tcTokenTimestamp: 1234,
+						tcTokenSenderTimestamp: 5678
+					}
+				]
+			}
+
+			const result = processHistoryMessage(historySync)
+
+			expect(result.nctSalt).toEqual(nctSalt)
+			expect(result.tcTokens).toEqual([
+				{
+					jid: '11111111111111@lid',
+					token: tcToken,
+					timestamp: '1234',
+					senderTimestamp: 5678
+				}
+			])
+			expect(result.lidPnMappings).toContainEqual({
+				lid: '11111111111111@lid',
+				pn: '1234567890123@s.whatsapp.net'
+			})
+		})
+
 		it('should extract contacts with LID and PN from conversations', () => {
 			const historySync: proto.IHistorySync = {
 				syncType: proto.HistorySync.HistorySyncType.INITIAL_BOOTSTRAP,

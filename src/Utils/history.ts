@@ -82,6 +82,7 @@ export const processHistoryMessage = (item: proto.IHistorySync, logger?: ILogger
 		case proto.HistorySync.HistorySyncType.RECENT:
 		case proto.HistorySync.HistorySyncType.FULL:
 		case proto.HistorySync.HistorySyncType.ON_DEMAND:
+		case proto.HistorySync.HistorySyncType.NON_BLOCKING_DATA:
 			for (const chat of item.conversations! as Chat[]) {
 				contacts.push({
 					id: chat.id!,

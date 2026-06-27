@@ -101,6 +101,12 @@ type CsTokenParams = {
 		keys: SignalKeyStoreWithTransaction
 	}
 	meLid?: string
+	onDiagnostic?: (diagnostic: {
+		reason: 'missing_me_lid' | 'missing_nct_salt' | 'built' | 'error'
+		meLid?: string
+		nctSaltBytes?: number
+		error?: string
+	}) => void
 }
 
 export async function buildTcTokenFromJid({
@@ -147,14 +153,21 @@ export async function storeNctSalt(keys: SignalKeyStoreWithTransaction, salt: Ui
 export async function buildCsTokenFromStoredSalt({
 	authState,
 	meLid,
-	baseContent = []
+	baseContent = [],
+	onDiagnostic
 }: CsTokenParams): Promise<BinaryNode[] | undefined> {
 	try {
-		if (!meLid) return baseContent.length > 0 ? baseContent : undefined
+		if (!meLid) {
+			onDiagnostic?.({ reason: 'missing_me_lid' })
+			return baseContent.length > 0 ? baseContent : undefined
+		}
 
 		const data = await authState.keys.get('tctoken', [NCT_SALT_KEY])
 		const nctSalt = data?.[NCT_SALT_KEY]?.nctSalt
-		if (!nctSalt?.length) return baseContent.length > 0 ? baseContent : undefined
+		if (!nctSalt?.length) {
+			onDiagnostic?.({ reason: 'missing_nct_salt', meLid, nctSaltBytes: nctSalt?.length || 0 })
+			return baseContent.length > 0 ? baseContent : undefined
+		}
 
 		baseContent.push({
 			tag: 'cstoken',
@@ -162,8 +175,10 @@ export async function buildCsTokenFromStoredSalt({
 			content: hmacSign(Buffer.from(meLid), nctSalt)
 		})
 
+		onDiagnostic?.({ reason: 'built', meLid, nctSaltBytes: nctSalt.length })
 		return baseContent
-	} catch {
+	} catch (error: any) {
+		onDiagnostic?.({ reason: 'error', meLid, error: error?.message || String(error) })
 		return baseContent.length > 0 ? baseContent : undefined
 	}
 }
@@ -177,6 +192,14 @@ type StoreTcTokensParams = {
 	onNewJidStored?: (jid: string) => void
 }
 
+export type StoreTcTokensResult = {
+	tokensNodeFound: boolean
+	tokenNodes: number
+	stored: number
+	skipped: number
+	storedJids: string[]
+}
+
 /**
  * Parse and store tctoken(s) from an IQ result node.
  * Includes timestamp monotonicity guard matching WA Web's handleIncomingTcToken.
@@ -188,13 +211,22 @@ export async function storeTcTokensFromIqResult({
 	keys,
 	getLIDForPN,
 	onNewJidStored
-}: StoreTcTokensParams) {
+}: StoreTcTokensParams): Promise<StoreTcTokensResult> {
 	const tokensNode = getBinaryNodeChild(result, 'tokens')
-	if (!tokensNode) return
+	const summary: StoreTcTokensResult = {
+		tokensNodeFound: !!tokensNode,
+		tokenNodes: 0,
+		stored: 0,
+		skipped: 0,
+		storedJids: []
+	}
+	if (!tokensNode) return summary
 
 	const tokenNodes = getBinaryNodeChildren(tokensNode, 'token')
+	summary.tokenNodes = tokenNodes.length
 	for (const tokenNode of tokenNodes) {
 		if (tokenNode.attrs.type !== 'trusted_contact' || !(tokenNode.content instanceof Uint8Array)) {
+			summary.skipped += 1
 			continue
 		}
 
@@ -208,12 +240,14 @@ export async function storeTcTokensFromIqResult({
 		const existingTs = existingEntry?.timestamp ? Number(existingEntry.timestamp) : 0
 		const incomingTs = tokenNode.attrs.t ? Number(tokenNode.attrs.t) : 0
 		if (existingTs > 0 && incomingTs > 0 && existingTs > incomingTs) {
+			summary.skipped += 1
 			continue
 		}
 
 		// Don't overwrite a valid timestamped token with a timestamp-less one —
 		// it would be treated as immediately expired by isTcTokenExpired
 		if (existingTs > 0 && !incomingTs) {
+			summary.skipped += 1
 			continue
 		}
 
@@ -226,6 +260,10 @@ export async function storeTcTokensFromIqResult({
 				}
 			}
 		})
+		summary.stored += 1
+		summary.storedJids.push(storageJid)
 		onNewJidStored?.(storageJid)
 	}
+
+	return summary
 }

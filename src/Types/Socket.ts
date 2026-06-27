@@ -109,6 +109,9 @@ export type SocketConfig = {
 	/** Enable recent message caching for retry handling */
 	enableRecentMessageCache: boolean
 
+	/** Timeout for the bounded privacy-token query before a 1:1 send */
+	privacyTokenQueryTimeoutMs: number
+
 	/** Handle ACKs with 'refresh_lid': 'true', emit 'lid-migration.update' */
 	enableLidMigrationSafety: boolean
 

@@ -72,7 +72,6 @@ import { USyncQuery, USyncUser } from '../WAUSync'
 import { makeNewsletterSocket } from './newsletter'
 
 export const makeMessagesSocket = (config: SocketConfig) => {
-	const PRE_SEND_TCTOKEN_TIMEOUT_MS = 700
 	const {
 		logger,
 		linkPreviewImageThumbnailWidth,
@@ -81,8 +80,10 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		patchMessageBeforeSending,
 		cachedGroupMetadata,
 		enableRecentMessageCache,
-		maxMsgRetryCount
+		maxMsgRetryCount,
+		privacyTokenQueryTimeoutMs
 	} = config
+	const preSendTcTokenTimeoutMs = Math.max(0, privacyTokenQueryTimeoutMs || 3000)
 	const sock = makeNewsletterSocket(config)
 	const {
 		ev,
@@ -1020,6 +1021,28 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				}
 			}
 
+			// WA Web stamps the PN counterpart when a direct 1:1 envelope is LID-addressed.
+			// This lets the server relate the LID send to the PN chat identity.
+			const isPeerMessage = additionalAttributes?.['category'] === 'peer'
+			const is1on1Send = !isGroup && !isStatus && !isNewsletter && !isPeerMessage
+			if (is1on1Send && isLidUser(destinationJid) && !additionalAttributes?.peer_recipient_pn) {
+				try {
+					const peerRecipientPn = await signalRepository.lidMapping.getPNForLID(destinationJid)
+					if (peerRecipientPn && isPnUser(peerRecipientPn)) {
+						additionalAttributes = {
+							...additionalAttributes,
+							peer_recipient_pn: jidNormalizedUser(peerRecipientPn)
+						}
+						logger.debug(
+							{ jid: destinationJid, peerRecipientPn: additionalAttributes.peer_recipient_pn },
+							'attached peer_recipient_pn for LID 1:1 message'
+						)
+					}
+				} catch (err: any) {
+					logger.debug({ jid: destinationJid, err: err?.message }, 'failed to resolve peer_recipient_pn')
+				}
+			}
+
 			const stanza: BinaryNode = {
 				tag: 'message',
 				attrs: {
@@ -1091,55 +1114,135 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			}
 
 			// WA Web never attaches tctoken to peer (AppStateSync) messages; server rejects with 479.
-			const isPeerMessage = additionalAttributes?.['category'] === 'peer'
-			const is1on1Send = !isGroup && !isStatus && !isNewsletter && !isPeerMessage
 			let didFetchTcToken = false
 			let privacyTokenNodeTag: 'tctoken' | 'cstoken' | undefined
 
-			// Resolve destination to LID for tctoken storage — matches Signal session key pattern
-			const tcTokenJid = is1on1Send ? await resolveTcTokenJid(destinationJid, getLIDForPN) : destinationJid
-			const contactTcTokenData = is1on1Send ? await authState.keys.get('tctoken', [tcTokenJid]) : {}
-			const existingTokenEntry = contactTcTokenData[tcTokenJid]
-			let tcTokenBuffer = existingTokenEntry?.token
+				// Resolve destination to LID for tctoken storage — matches Signal session key pattern
+				const tcTokenJid = is1on1Send ? await resolveTcTokenJid(destinationJid, getLIDForPN) : destinationJid
+				const peerRecipientPn =
+					is1on1Send && isLidUser(destinationJid) && additionalAttributes?.peer_recipient_pn
+						? jidNormalizedUser(additionalAttributes.peer_recipient_pn)
+						: undefined
+				const tcTokenCandidateJids = [
+					tcTokenJid,
+					...(peerRecipientPn && isPnUser(peerRecipientPn) ? [peerRecipientPn] : []),
+					...(destinationJid !== tcTokenJid ? [destinationJid] : [])
+				].filter((candidate, index, candidates) => candidates.indexOf(candidate) === index)
+				const findStoredTcToken = async () => {
+					const data = is1on1Send ? await authState.keys.get('tctoken', tcTokenCandidateJids) : {}
+					for (const candidate of tcTokenCandidateJids) {
+						const entry = data[candidate]
+						if (entry?.token?.length && !isTcTokenExpired(entry.timestamp)) {
+							return { entry, jid: candidate, token: entry.token }
+						}
+					}
 
-			// Treat expired tokens the same as missing — re-fetch from server
-			if (tcTokenBuffer?.length && isTcTokenExpired(existingTokenEntry?.timestamp)) {
-				logger.debug(
-					{ jid: destinationJid, timestamp: existingTokenEntry?.timestamp },
-					'tctoken expired, will re-fetch'
-				)
-				tcTokenBuffer = undefined
-				// Opportunistic cleanup: remove expired token from store
-				try {
-					await authState.keys.set({ tctoken: { [tcTokenJid]: null } })
-				} catch {
-					/* ignore cleanup errors */
+					return {
+						entry: data[tcTokenJid],
+						jid: tcTokenJid,
+						token: data[tcTokenJid]?.token
+					}
 				}
-			}
+				let storedTcToken = await findStoredTcToken()
+				let existingTokenEntry = storedTcToken.entry
+				let activeTcTokenJid = storedTcToken.jid
+				let tcTokenBuffer = storedTcToken.token
+
+				// Treat expired tokens the same as missing — re-fetch from server
+				if (tcTokenBuffer?.length && isTcTokenExpired(existingTokenEntry?.timestamp)) {
+					logger.debug(
+						{ jid: destinationJid, tcTokenJid: activeTcTokenJid, timestamp: existingTokenEntry?.timestamp },
+						'tctoken expired, will re-fetch'
+					)
+					tcTokenBuffer = undefined
+					// Opportunistic cleanup: remove expired token from store
+					try {
+						await authState.keys.set({ tctoken: { [activeTcTokenJid]: null } })
+					} catch {
+						/* ignore cleanup errors */
+					}
+				}
 
 			// If tctoken is missing or expired for a 1:1 send, proactively fetch it from the server
 			if (!tcTokenBuffer?.length && is1on1Send) {
 				try {
 					logger.debug(
-						{ jid: destinationJid, timeoutMs: PRE_SEND_TCTOKEN_TIMEOUT_MS },
+						{ jid: destinationJid, tcTokenJid, candidates: tcTokenCandidateJids, timeoutMs: preSendTcTokenTimeoutMs },
 						'tctoken missing, requesting from server (bounded wait)'
 					)
-					const fetchResult = await getPrivacyTokens([destinationJid], undefined, PRE_SEND_TCTOKEN_TIMEOUT_MS)
+					const fetchJids = [
+						destinationJid,
+						...(peerRecipientPn && isPnUser(peerRecipientPn) ? [peerRecipientPn] : [])
+					].filter((candidate, index, candidates) => candidates.indexOf(candidate) === index)
+					const fetchSummaries: {
+						jid: string
+						stored?: number
+						tokenNodes?: number
+						tokensNodeFound?: boolean
+						storedJids?: string[]
+						statusCode?: number
+						error?: string
+					}[] = []
+					for (const fetchJid of fetchJids) {
+						try {
+							const fetchResult = await getPrivacyTokens([fetchJid], undefined, preSendTcTokenTimeoutMs)
+							const storeResult = await storeTcTokensFromIqResult({
+								result: fetchResult,
+								fallbackJid: fetchJid,
+								keys: authState.keys,
+								getLIDForPN: signalRepository.lidMapping.getLIDForPN.bind(signalRepository.lidMapping)
+							})
+							fetchSummaries.push({
+								jid: fetchJid,
+								stored: storeResult.stored,
+								tokenNodes: storeResult.tokenNodes,
+								tokensNodeFound: storeResult.tokensNodeFound,
+								storedJids: storeResult.storedJids
+							})
 
-					// Parse inline tokens from IQ result using the shared parser
-					// (includes monotonicity guard)
-					await storeTcTokensFromIqResult({
-						result: fetchResult,
-						fallbackJid: destinationJid,
-						keys: authState.keys,
-						getLIDForPN: signalRepository.lidMapping.getLIDForPN.bind(signalRepository.lidMapping)
-					})
+							storedTcToken = await findStoredTcToken()
+							if (storedTcToken.token?.length) {
+								break
+							}
+						} catch (err: any) {
+							fetchSummaries.push({
+								jid: fetchJid,
+								statusCode: err?.output?.statusCode,
+								error: err?.message
+							})
+							logger.warn(
+								{
+									jid: destinationJid,
+									tcTokenJid,
+									fetchJid,
+									timeoutMs: preSendTcTokenTimeoutMs,
+									statusCode: err?.output?.statusCode
+								},
+								'failed to fetch privacy token candidate before send'
+							)
+						}
+					}
 
 					// Re-read from key store — the notification handler or inline
 					// parsing above may have stored the token
-					const refreshed = await authState.keys.get('tctoken', [tcTokenJid])
-					const refreshedEntry = refreshed[tcTokenJid]
-					tcTokenBuffer = refreshedEntry?.token
+					storedTcToken = await findStoredTcToken()
+					const refreshedEntry = storedTcToken.entry
+					activeTcTokenJid = storedTcToken.jid
+					existingTokenEntry = refreshedEntry
+					tcTokenBuffer = storedTcToken.token
+					logger.debug(
+						{
+							jid: destinationJid,
+							tcTokenJid,
+							activeTcTokenJid,
+							fetchJids,
+							candidates: tcTokenCandidateJids,
+							timeoutMs: preSendTcTokenTimeoutMs,
+							fetchSummaries,
+							tokenBytes: tcTokenBuffer?.length || 0
+						},
+						'tctoken pre-send fetch completed'
+					)
 
 					// The getPrivacyTokens IQ (type='set') also acts as issuance,
 					// so record senderTimestamp to prevent redundant fire-and-forget
@@ -1147,7 +1250,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					if (refreshedEntry?.token?.length) {
 						await authState.keys.set({
 							tctoken: {
-								[tcTokenJid]: {
+								[activeTcTokenJid]: {
 									...refreshedEntry,
 									senderTimestamp: unixTimestampSeconds()
 								}
@@ -1160,7 +1263,9 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 					logger.warn(
 						{
 							jid: destinationJid,
-							timeoutMs: PRE_SEND_TCTOKEN_TIMEOUT_MS,
+							tcTokenJid,
+							candidates: tcTokenCandidateJids,
+							timeoutMs: preSendTcTokenTimeoutMs,
 							statusCode: err?.output?.statusCode,
 							trace: err?.stack
 						},
@@ -1179,12 +1284,26 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			} else if (is1on1Send) {
 				const csTokenContent = await buildCsTokenFromStoredSalt({
 					authState,
-					meLid: authState.creds.me?.lid
+					meLid: authState.creds.me?.lid,
+					onDiagnostic: diagnostic => {
+						const logPayload = {
+							jid: destinationJid,
+							tcTokenJid,
+							...diagnostic
+						}
+						if (diagnostic.reason === 'built') {
+							logger.debug(logPayload, 'cstoken fallback build diagnostics')
+						} else {
+							logger.warn(logPayload, 'cstoken fallback unavailable')
+						}
+					}
 				})
 				if (csTokenContent?.length) {
 					;(stanza.content as BinaryNode[]).push(...csTokenContent)
 					privacyTokenNodeTag = 'cstoken'
-					logger.debug({ jid: destinationJid }, 'attached cstoken fallback to 1:1 message')
+					logger.debug({ jid: destinationJid, tcTokenJid, nodes: csTokenContent.length }, 'attached cstoken fallback to 1:1 message')
+				} else {
+					logger.warn({ jid: destinationJid, tcTokenJid }, 'sending 1:1 message without privacy token')
 				}
 			}
 
@@ -1232,12 +1351,23 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 						// Note: onNewJidStored not passed — the pruning index lives in messages-recv
 						// (higher layer). This is benign: fire-and-forget only runs for contacts
 						// we're actively messaging, so their JIDs will be tracked via the receive path.
-						await storeTcTokensFromIqResult({
+						const storeResult = await storeTcTokensFromIqResult({
 							result,
 							fallbackJid: tcTokenJid,
 							keys: authState.keys,
 							getLIDForPN
 						})
+						logger.debug(
+							{
+								jid: destinationJid,
+								tcTokenJid,
+								stored: storeResult.stored,
+								tokenNodes: storeResult.tokenNodes,
+								tokensNodeFound: storeResult.tokensNodeFound,
+								storedJids: storeResult.storedJids
+							},
+							'fire-and-forget tctoken issuance completed'
+						)
 
 						// Persist senderTimestamp to prevent redundant issuances.
 						// WA Web stores tcTokenSenderTimestamp in the chat table unconditionally.

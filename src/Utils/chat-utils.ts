@@ -1003,12 +1003,22 @@ export const processSyncAction = (
 			value: action.privacySettingChannelsPersonalisedRecommendationAction
 		})
 	} else if (action?.nctSaltSyncAction || type === 'nct_salt_sync') {
+		const saltBytes = action?.nctSaltSyncAction?.salt?.length || 0
+		logger?.debug(
+			{ operation: syncAction.operation, type, saltBytes },
+			'received nct salt sync action'
+		)
 		if (syncAction.operation === proto.SyncdMutation.SyncdOperation.REMOVE) {
 			options?.onNctSalt?.(null).catch(err => logger?.warn({ err }, 'failed to remove nct salt from app state'))
 		} else if (action?.nctSaltSyncAction?.salt?.length) {
 			options
 				?.onNctSalt?.(action.nctSaltSyncAction.salt)
 				.catch(err => logger?.warn({ err }, 'failed to store nct salt from app state'))
+		} else {
+			logger?.warn(
+				{ operation: syncAction.operation, type, saltBytes },
+				'nct salt sync action without salt bytes'
+			)
 		}
 	} else {
 		logger?.debug({ syncAction, id }, 'unprocessable update')
