@@ -46,10 +46,16 @@ type CsTokenParams = {
         keys: SignalKeyStoreWithTransaction;
     };
     meLid?: string;
+    onDiagnostic?: (diagnostic: {
+        reason: 'missing_me_lid' | 'missing_nct_salt' | 'built' | 'error';
+        meLid?: string;
+        nctSaltBytes?: number;
+        error?: string;
+    }) => void;
 };
 export declare function buildTcTokenFromJid({ authState, jid, baseContent, getLIDForPN }: TcTokenParams): Promise<BinaryNode[] | undefined>;
 export declare function storeNctSalt(keys: SignalKeyStoreWithTransaction, salt: Uint8Array | Buffer | null | undefined): Promise<void>;
-export declare function buildCsTokenFromStoredSalt({ authState, meLid, baseContent }: CsTokenParams): Promise<BinaryNode[] | undefined>;
+export declare function buildCsTokenFromStoredSalt({ authState, meLid, baseContent, onDiagnostic }: CsTokenParams): Promise<BinaryNode[] | undefined>;
 type StoreTcTokensParams = {
     result: BinaryNode;
     fallbackJid: string;
@@ -58,11 +64,18 @@ type StoreTcTokensParams = {
     /** Optional callback when a new JID is stored (for index tracking) */
     onNewJidStored?: (jid: string) => void;
 };
+export type StoreTcTokensResult = {
+    tokensNodeFound: boolean;
+    tokenNodes: number;
+    stored: number;
+    skipped: number;
+    storedJids: string[];
+};
 /**
  * Parse and store tctoken(s) from an IQ result node.
  * Includes timestamp monotonicity guard matching WA Web's handleIncomingTcToken.
  * Used by both the blocking fetch (messages-send) and IQ response (messages-recv) paths.
  */
-export declare function storeTcTokensFromIqResult({ result, fallbackJid, keys, getLIDForPN, onNewJidStored }: StoreTcTokensParams): Promise<void>;
+export declare function storeTcTokensFromIqResult({ result, fallbackJid, keys, getLIDForPN, onNewJidStored }: StoreTcTokensParams): Promise<StoreTcTokensResult>;
 export {};
 //# sourceMappingURL=tc-token-utils.d.ts.map

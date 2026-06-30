@@ -106,6 +106,8 @@ export type SocketConfig = {
     enableAutoSessionRecreation: boolean;
     /** Enable recent message caching for retry handling */
     enableRecentMessageCache: boolean;
+    /** Timeout for the bounded privacy-token query before a 1:1 send */
+    privacyTokenQueryTimeoutMs: number;
     /** Handle ACKs with 'refresh_lid': 'true', emit 'lid-migration.update' */
     enableLidMigrationSafety: boolean;
     /** Force-refresh PN-->LID mappings when a refresh_lid ACK is received */

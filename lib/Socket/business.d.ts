@@ -212,6 +212,13 @@ export declare const makeBusinessSocket: (config: SocketConfig) => {
         jid: string;
         exists: boolean;
     }[] | undefined>;
+    handlePasskeyPrologueRequest: (node: BinaryNode) => Promise<void>;
+    handlePasskeyContinuation: (node: BinaryNode) => Promise<void>;
+    sendPasskeyResponse: ({ credentialId, assertionJson }: {
+        credentialId: Buffer | Uint8Array;
+        assertionJson: Buffer | Uint8Array | string;
+    }) => Promise<void>;
+    sendPasskeyConfirmation: () => Promise<void>;
     fetchAccountReachoutTimelock: () => Promise<import("../index.js").ReachoutTimelockState>;
     fetchNewChatMessageCap: () => Promise<import("../index.js").NewChatMessageCapInfo>;
 };

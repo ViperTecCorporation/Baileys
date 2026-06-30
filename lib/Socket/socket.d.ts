@@ -54,6 +54,13 @@ export declare const makeSocket: (config: SocketConfig) => {
         jid: string;
         exists: boolean;
     }[] | undefined>;
+    handlePasskeyPrologueRequest: (node: BinaryNode) => Promise<void>;
+    handlePasskeyContinuation: (node: BinaryNode) => Promise<void>;
+    sendPasskeyResponse: ({ credentialId, assertionJson }: {
+        credentialId: Buffer | Uint8Array;
+        assertionJson: Buffer | Uint8Array | string;
+    }) => Promise<void>;
+    sendPasskeyConfirmation: () => Promise<void>;
     fetchAccountReachoutTimelock: () => Promise<ReachoutTimelockState>;
     fetchNewChatMessageCap: () => Promise<NewChatMessageCapInfo>;
 };
