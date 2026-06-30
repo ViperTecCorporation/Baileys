@@ -10,6 +10,7 @@ export * from './Product'
 export * from './Call'
 export * from './Signal'
 export * from './Mex'
+export * from './Passkey'
 
 import type { AuthenticationState } from './Auth'
 import type { SocketConfig } from './Socket'

@@ -1255,6 +1255,12 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				authState.creds.registered = true
 				ev.emit('creds.update', authState.creds)
 				break
+			case 'passkey_prologue_request':
+				await sock.handlePasskeyPrologueRequest(node)
+				break
+			case 'crsc_continuation':
+				await sock.handlePasskeyContinuation(node)
+				break
 			case 'privacy_token':
 				await handlePrivacyTokenNotification(node)
 				break

@@ -27,10 +27,17 @@ import {
 	aesEncryptCTR,
 	bindWaitForConnectionUpdate,
 	buildPairingQRData,
+	buildEncryptedPairingRequest,
+	buildShortcakeProloguePayload,
 	bytesToCrockford,
+	computePairingHandoffProof,
 	configureSuccessfulPairing,
 	Curve,
+	decodePrimaryEphemeralIdentity,
+	derivePasskeyHandoffKey,
 	derivePairingCodeKey,
+	deriveShortcakeEncryptionKey,
+	deriveShortcakeVerificationCode,
 	generateLoginNode,
 	generateMdTagPrefix,
 	generateRegistrationNode,
@@ -42,6 +49,7 @@ import {
 	makeNoiseHandler,
 	promiseTimeout,
 	signedKeyPair,
+	type ShortcakeLinkingState,
 	xmppSignedPreKey
 } from '../Utils'
 import {
@@ -51,6 +59,7 @@ import {
 	encodeBinaryNode,
 	getAllBinaryNodeChildren,
 	getBinaryNodeChild,
+	getBinaryNodeChildBuffer,
 	getBinaryNodeChildren,
 	isLidUser,
 	jidDecode,
@@ -99,6 +108,10 @@ export const makeSocket = (config: SocketConfig) => {
 	const publicWAMBuffer = new BinaryInfo()
 
 	let serverTimeOffsetMs = 0
+	let passkeyLinkingState: ShortcakeLinkingState | undefined
+	let passkeyBridgeId: string | undefined
+	let passkeyHandoffKey: { key: Buffer; expiresAt: number } | undefined
+	let passkeySkipHandoffUX = false
 
 	const uqTagId = generateMdTagPrefix()
 	const generateMessageTag = () => `${uqTagId}${epoch++}`
@@ -262,6 +275,207 @@ export const makeSocket = (config: SocketConfig) => {
 		}
 
 		return result
+	}
+
+	const getPasskeyRequestOptions = async () => {
+		const result = await query({
+			tag: 'iq',
+			attrs: {
+				to: S_WHATSAPP_NET,
+				type: 'get',
+				xmlns: 'md'
+			},
+			content: [{ tag: 'passkey_request_options', attrs: {} }]
+		})
+		const options = getBinaryNodeChildBuffer(result, 'passkey_request_options')
+		if (!options) {
+			throw new Boom('passkey_request_options response is missing content', { statusCode: 500, data: result })
+		}
+
+		return Buffer.from(options)
+	}
+
+	const getCompanionRef = async () => {
+		const result = await query({
+			tag: 'iq',
+			attrs: {
+				to: S_WHATSAPP_NET,
+				type: 'get',
+				xmlns: 'md'
+			},
+			content: [{ tag: 'ref', attrs: {} }]
+		})
+		const ref = getBinaryNodeChildBuffer(result, 'ref')
+		if (!ref) {
+			throw new Boom('ref response is missing content', { statusCode: 500, data: result })
+		}
+
+		return Buffer.from(ref).toString('utf-8')
+	}
+
+	const getPasskeyDeviceType = () => {
+		const platformType = browser[1].toUpperCase()
+		return (
+			proto.DeviceProps.PlatformType[platformType as keyof typeof proto.DeviceProps.PlatformType] ||
+			proto.DeviceProps.PlatformType.CHROME
+		)
+	}
+
+	const handlePasskeyPrologueRequest = async (node: BinaryNode) => {
+		if (node.attrs.from && node.attrs.from !== S_WHATSAPP_NET) {
+			logger.warn({ from: node.attrs.from }, 'ignoring passkey prologue request from non-server jid')
+			return
+		}
+
+		let requestOptions = getBinaryNodeChildBuffer(node, 'passkey_request_options')
+		if (!requestOptions) {
+			logger.warn('passkey prologue request missing options, fetching via iq')
+			requestOptions = await getPasskeyRequestOptions()
+		}
+
+		passkeyBridgeId = generateMessageTag()
+		passkeyHandoffKey = {
+			key: derivePasskeyHandoffKey(Buffer.from(creds.advSecretKey, 'base64')),
+			expiresAt: Date.now() + 5 * 60_000
+		}
+		creds.advSecretKey = randomBytes(32).toString('base64')
+		ev.emit('creds.update', { advSecretKey: creds.advSecretKey })
+		ev.emit('passkey.update', {
+			status: 'request',
+			bridgeId: passkeyBridgeId,
+			requestOptions: Buffer.from(requestOptions)
+		})
+	}
+
+	const sendPasskeyResponse = async ({
+		credentialId,
+		assertionJson
+	}: {
+		credentialId: Buffer | Uint8Array
+		assertionJson: Buffer | Uint8Array | string
+	}) => {
+		const ref = await getCompanionRef()
+		const { prologuePayload, state } = buildShortcakeProloguePayload(ref, getPasskeyDeviceType())
+		passkeyLinkingState = { ...state, bridgeId: passkeyBridgeId }
+
+		const prologueContent: BinaryNode[] = [
+			{ tag: 'credential_id', attrs: {}, content: Buffer.from(credentialId) },
+			{ tag: 'webauthn_assertion', attrs: {}, content: Buffer.from(assertionJson) },
+			{ tag: 'prologue_payload', attrs: {}, content: prologuePayload }
+		]
+
+		if (passkeyHandoffKey && passkeyHandoffKey.expiresAt > Date.now()) {
+			prologueContent.push({
+				tag: 'pairing_handoff_proof',
+				attrs: {},
+				content: computePairingHandoffProof(passkeyHandoffKey.key, prologuePayload)
+			})
+			passkeySkipHandoffUX = true
+		} else {
+			passkeySkipHandoffUX = false
+		}
+
+		await query({
+			tag: 'iq',
+			attrs: {
+				to: S_WHATSAPP_NET,
+				type: 'set',
+				xmlns: 'md'
+			},
+			content: [
+				{
+					tag: 'passkey_prologue',
+					attrs: {},
+					content: prologueContent
+				}
+			]
+		})
+		passkeyHandoffKey = undefined
+		ev.emit('passkey.update', {
+			status: 'response-sent',
+			bridgeId: passkeyBridgeId
+		})
+	}
+
+	const handlePasskeyContinuation = async (node: BinaryNode) => {
+		if (node.attrs.from && node.attrs.from !== S_WHATSAPP_NET) {
+			logger.warn({ from: node.attrs.from }, 'ignoring passkey continuation from non-server jid')
+			return
+		}
+
+		if (!passkeyLinkingState) {
+			throw new Boom('received passkey continuation without a linking state', { statusCode: 500, data: node })
+		}
+
+		const rawIdentity = getBinaryNodeChildBuffer(node, 'primary_ephemeral_identity')
+		if (!rawIdentity) {
+			throw new Boom('passkey continuation missing primary_ephemeral_identity', { statusCode: 500, data: node })
+		}
+
+		const primary = decodePrimaryEphemeralIdentity(Buffer.from(rawIdentity))
+		await query({
+			tag: 'iq',
+			attrs: {
+				to: S_WHATSAPP_NET,
+				type: 'set',
+				xmlns: 'md'
+			},
+			content: [{ tag: 'companion_nonce', attrs: {}, content: passkeyLinkingState.companionNonce }]
+		})
+
+		passkeyLinkingState.encryptionKey = deriveShortcakeEncryptionKey(
+			passkeyLinkingState.keyPair.private,
+			primary.publicKey,
+			passkeyLinkingState.deviceType,
+			passkeyLinkingState.ref
+		)
+		const code = deriveShortcakeVerificationCode(
+			passkeyLinkingState.companionNonce,
+			primary.publicKey,
+			primary.nonce
+		)
+
+		ev.emit('passkey.update', {
+			status: 'confirmation',
+			bridgeId: passkeyLinkingState.bridgeId,
+			code,
+			skipHandoffUX: passkeySkipHandoffUX
+		})
+	}
+
+	const sendPasskeyConfirmation = async () => {
+		if (!passkeyLinkingState) {
+			throw new Boom('no passkey linking state available', { statusCode: 500 })
+		}
+
+		if (!passkeyLinkingState.encryptionKey) {
+			throw new Boom('passkey linking state does not have an encryption key yet', { statusCode: 500 })
+		}
+
+		const { encryptedPairingRequest } = buildEncryptedPairingRequest(passkeyLinkingState.encryptionKey, {
+			companionPublicKey: creds.noiseKey.public,
+			companionIdentityKey: creds.signedIdentityKey.public,
+			advSecret: Buffer.from(creds.advSecretKey, 'base64')
+		})
+
+		await query({
+			tag: 'iq',
+			attrs: {
+				to: S_WHATSAPP_NET,
+				type: 'set',
+				xmlns: 'md'
+			},
+			content: [{ tag: 'encrypted_pairing_request', attrs: {}, content: encryptedPairingRequest }]
+		})
+
+		const completedBridgeId = passkeyLinkingState.bridgeId
+		passkeyLinkingState = undefined
+		passkeyBridgeId = undefined
+		passkeySkipHandoffUX = false
+		ev.emit('passkey.update', {
+			status: 'completed',
+			bridgeId: completedBridgeId
+		})
 	}
 
 	// Validate current key-bundle on server; on failure, trigger pre-key upload and rethrow
@@ -1222,6 +1436,10 @@ export const makeSocket = (config: SocketConfig) => {
 		sendWAMBuffer,
 		executeUSyncQuery,
 		onWhatsApp,
+		handlePasskeyPrologueRequest,
+		handlePasskeyContinuation,
+		sendPasskeyResponse,
+		sendPasskeyConfirmation,
 		fetchAccountReachoutTimelock,
 		fetchNewChatMessageCap
 	}

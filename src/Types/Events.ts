@@ -14,6 +14,7 @@ import type {
 import type { Label } from './Label'
 import type { LabelAssociation } from './LabelAssociation'
 import type { MessageUpsertType, MessageUserReceiptUpdate, WAMessage, WAMessageKey, WAMessageUpdate } from './Message'
+import type { PasskeyUpdate } from './Passkey'
 import type { ConnectionState, NewChatMessageCapInfo } from './State'
 
 // TODO: refactor this mess
@@ -118,6 +119,7 @@ export type BaileysEventMap = {
 	'newsletter-settings.update': { id: string; update: any }
 
 	'message-capping.update': NewChatMessageCapInfo
+	'passkey.update': PasskeyUpdate
 
 	/** Settings and actions sync events */
 	'chats.lock': { id: string; locked: boolean }
