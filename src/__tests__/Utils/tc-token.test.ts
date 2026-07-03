@@ -291,7 +291,7 @@ describe('buildTcTokenFromJid', () => {
 })
 
 describe('cstoken fallback', () => {
-	const ME_LID = '123456789012345@lid'
+	const RECIPIENT_LID = '123456789012345@lid'
 	const NCT_SALT = Buffer.from([8, 6, 7, 5, 3, 0, 9])
 
 	let mockKeys: jest.Mocked<SignalKeyStoreWithTransaction>
@@ -310,20 +310,20 @@ describe('cstoken fallback', () => {
 		})
 	})
 
-	it('builds cstoken from stored nct salt and own LID', async () => {
+	it('builds cstoken from stored nct salt and recipient LID', async () => {
 		// @ts-ignore
 		mockKeys.get.mockResolvedValue({ __nct_salt__: { nctSalt: NCT_SALT } })
 
 		const result = await buildCsTokenFromStoredSalt({
 			authState: { keys: mockKeys },
-			meLid: ME_LID
+			recipientLid: RECIPIENT_LID
 		})
 
 		expect(result).toHaveLength(1)
 		expect(result![0]).toEqual({
 			tag: 'cstoken',
 			attrs: {},
-			content: hmacSign(Buffer.from(ME_LID), NCT_SALT)
+			content: hmacSign(Buffer.from(RECIPIENT_LID), NCT_SALT)
 		})
 	})
 
@@ -334,14 +334,14 @@ describe('cstoken fallback', () => {
 
 		const result = await buildCsTokenFromStoredSalt({
 			authState: { keys: mockKeys },
-			meLid: ME_LID,
+			recipientLid: RECIPIENT_LID,
 			baseContent: [existingNode]
 		})
 
 		expect(result).toEqual([existingNode])
 	})
 
-	it('returns undefined when own LID is missing and no base content exists', async () => {
+	it('returns undefined when recipient LID is missing and no base content exists', async () => {
 		const result = await buildCsTokenFromStoredSalt({
 			authState: { keys: mockKeys }
 		})

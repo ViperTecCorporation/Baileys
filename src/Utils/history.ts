@@ -11,6 +11,7 @@ import { normalizeMessageContent } from './messages'
 import { downloadContentFromMessage } from './messages-media'
 
 const inflatePromise = promisify(inflate)
+const historySyncDiagnosticsEnabled = () => process.env.BAILEYS_HISTORY_SYNC_DIAGNOSTICS === 'true'
 
 const extractPnFromMessages = (messages: proto.IHistorySyncMsg[]): string | undefined => {
 	for (const msgItem of messages) {
@@ -31,6 +32,10 @@ const extractPnFromMessages = (messages: proto.IHistorySyncMsg[]): string | unde
 }
 
 export const downloadHistory = async (msg: proto.Message.IHistorySyncNotification, options: RequestInit) => {
+	const mediaKeyBytes = msg.mediaKey?.length || 0
+	const fileSha256Bytes = msg.fileSha256?.length || 0
+	const fileEncSha256Bytes = msg.fileEncSha256?.length || 0
+	const directPathLength = msg.directPath?.length || 0
 	const stream = await downloadContentFromMessage(msg, 'md-msg-hist', { options })
 	// Pipe decrypted stream directly through zlib inflate
 	// This avoids allocating an intermediate buffer for the compressed data
@@ -40,6 +45,11 @@ export const downloadHistory = async (msg: proto.Message.IHistorySyncNotificatio
 	await pipeline(stream, inflater)
 
 	const buffer = Buffer.concat(chunks)
+	if (!buffer.length) {
+		throw new Error(
+			`empty inflated history sync payload mediaKeyBytes=${mediaKeyBytes} fileSha256Bytes=${fileSha256Bytes} fileEncSha256Bytes=${fileEncSha256Bytes} directPathLength=${directPathLength}`
+		)
+	}
 	const syncData = proto.HistorySync.decode(buffer)
 	return syncData
 }
@@ -156,13 +166,33 @@ export const processHistoryMessage = (item: proto.IHistorySync, logger?: ILogger
 			break
 	}
 
+	const nctSalt = item.nctSalt ? Buffer.from(item.nctSalt) : undefined
+	if (historySyncDiagnosticsEnabled()) {
+		logger?.info(
+			{
+				syncType: item.syncType,
+				syncTypeName:
+					typeof item.syncType === 'number'
+						? proto.HistorySync.HistorySyncType[item.syncType] || `${item.syncType}`
+						: `${item.syncType || 'unknown'}`,
+				progress: item.progress,
+				conversations: item.conversations?.length || 0,
+				inlineContacts: item.inlineContacts?.length || 0,
+				phoneNumberToLidMappings: item.phoneNumberToLidMappings?.length || 0,
+				tcTokens: tcTokens.length,
+				nctSaltBytes: nctSalt?.length || 0
+			},
+			'decoded history sync privacy diagnostics'
+		)
+	}
+
 	return {
 		chats,
 		contacts,
 		messages,
 		lidPnMappings,
 		tcTokens,
-		nctSalt: item.nctSalt ? Buffer.from(item.nctSalt) : undefined,
+		nctSalt,
 		pastParticipants: item.pastParticipants,
 		syncType: item.syncType,
 		progress: item.progress
@@ -175,10 +205,48 @@ export const downloadAndProcessHistorySyncNotification = async (
 	logger?: ILogger
 ) => {
 	let historyMsg: proto.HistorySync
+	const syncTypeName =
+		typeof msg.syncType === 'number'
+			? proto.HistorySync.HistorySyncType[msg.syncType] || `${msg.syncType}`
+			: `${msg.syncType || 'unknown'}`
+	if (historySyncDiagnosticsEnabled()) {
+		logger?.info(
+			{
+				syncType: msg.syncType,
+				syncTypeName,
+				chunkOrder: msg.chunkOrder,
+				progress: msg.progress,
+				inlinePayloadBytes: msg.initialHistBootstrapInlinePayload?.length || 0,
+				mediaKeyBytes: msg.mediaKey?.length || 0,
+				fileSha256Bytes: msg.fileSha256?.length || 0,
+				fileEncSha256Bytes: msg.fileEncSha256?.length || 0,
+				directPathLength: msg.directPath?.length || 0,
+				fileLength: msg.fileLength ? String(toNumber(msg.fileLength)) : undefined
+			},
+			'history sync notification payload diagnostics'
+		)
+	}
 	if (msg.initialHistBootstrapInlinePayload) {
-		historyMsg = proto.HistorySync.decode(await inflatePromise(msg.initialHistBootstrapInlinePayload))
+		try {
+			const inflated = await inflatePromise(msg.initialHistBootstrapInlinePayload)
+			if (historySyncDiagnosticsEnabled()) {
+				logger?.info(
+					{ syncType: msg.syncType, syncTypeName, inlinePayloadBytes: msg.initialHistBootstrapInlinePayload.length, inflatedBytes: inflated.length },
+					'inflated inline history sync payload'
+				)
+			}
+			historyMsg = proto.HistorySync.decode(inflated)
+		} catch (err) {
+			logger?.warn({ err, syncType: msg.syncType, syncTypeName }, 'failed to inflate/decode inline history sync payload')
+			throw err
+		}
 	} else {
-		historyMsg = await downloadHistory(msg, options)
+		try {
+			historyMsg = await downloadHistory(msg, options)
+		} catch (err) {
+			logger?.warn({ err, syncType: msg.syncType, syncTypeName }, 'failed to download/decode history sync payload')
+			throw err
+		}
 	}
 
 	return processHistoryMessage(historyMsg, logger)

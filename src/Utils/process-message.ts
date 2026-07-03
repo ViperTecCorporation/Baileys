@@ -56,6 +56,7 @@ const REAL_MSG_STUB_TYPES = new Set([
 ])
 
 const REAL_MSG_REQ_ME_STUB_TYPES = new Set([WAMessageStubType.GROUP_PARTICIPANT_ADD])
+const historySyncDiagnosticsEnabled = () => process.env.BAILEYS_HISTORY_SYNC_DIAGNOSTICS === 'true'
 
 /** Cleans a received message to further processing */
 export const cleanMessage = (message: WAMessage, meId: string, meLid: string) => {
@@ -340,6 +341,40 @@ const processMessage = async (
 
 	const protocolMsg = content?.protocolMessage
 	if (protocolMsg) {
+		const protocolTypeName =
+			typeof protocolMsg.type === 'number'
+				? proto.Message.ProtocolMessage.Type[protocolMsg.type] || `${protocolMsg.type}`
+				: `${protocolMsg.type || 'unknown'}`
+		if (historySyncDiagnosticsEnabled() && protocolMsg.type === proto.Message.ProtocolMessage.Type.HISTORY_SYNC_NOTIFICATION) {
+			const histNotification = protocolMsg.historySyncNotification
+			logger?.info(
+				{
+					msgId: message.key.id,
+					fromMe: message.key.fromMe,
+					remoteJid: message.key.remoteJid,
+					participant: message.key.participant,
+					protocolType: protocolMsg.type,
+					protocolTypeName,
+					hasHistorySyncNotification: !!histNotification,
+					syncType: histNotification?.syncType,
+					syncTypeName:
+						typeof histNotification?.syncType === 'number'
+							? proto.HistorySync.HistorySyncType[histNotification.syncType] || `${histNotification.syncType}`
+							: `${histNotification?.syncType || 'unknown'}`,
+					chunkOrder: histNotification?.chunkOrder,
+					progress: histNotification?.progress,
+					inlinePayloadBytes: histNotification?.initialHistBootstrapInlinePayload?.length || 0,
+					mediaKeyBytes: histNotification?.mediaKey?.length || 0,
+					fileSha256Bytes: histNotification?.fileSha256?.length || 0,
+					fileEncSha256Bytes: histNotification?.fileEncSha256?.length || 0,
+					directPathLength: histNotification?.directPath?.length || 0,
+					fileLength: histNotification?.fileLength ? String(toNumber(histNotification.fileLength)) : undefined,
+					shouldProcessHistoryMsg,
+					processedHistoryMessages: creds.processedHistoryMessages?.length || 0
+				},
+				'received history sync protocolMessage'
+			)
+		}
 		// Mirror whatsmeow's `handleProtocolMessage` guard, but applied only to
 		// the protocol message types that originate from our own device — an
 		// attacker could otherwise spoof any of these to manipulate local state.
@@ -385,15 +420,21 @@ const processMessage = async (
 				const process = shouldProcessHistoryMsg
 				const isLatest = !creds.processedHistoryMessages?.length
 
-				logger?.info(
-					{
-						histNotification,
-						process,
-						id: message.key.id,
-						isLatest
-					},
-					'got history notification'
-				)
+				if (historySyncDiagnosticsEnabled()) {
+					logger?.info(
+						{
+							process,
+							id: message.key.id,
+							isLatest,
+							syncType: histNotification?.syncType,
+							progress: histNotification?.progress,
+							inlinePayloadBytes: histNotification?.initialHistBootstrapInlinePayload?.length || 0,
+							mediaKeyBytes: histNotification?.mediaKey?.length || 0,
+							directPathLength: histNotification?.directPath?.length || 0
+						},
+						'got history notification'
+					)
+				}
 
 				if (process) {
 					// TODO: investigate
@@ -407,20 +448,22 @@ const processMessage = async (
 					}
 
 					const data = await downloadAndProcessHistorySyncNotification(histNotification, options, logger)
-					logger?.info(
-						{
-							syncType: data.syncType,
-							syncTypeName:
-								typeof data.syncType === 'number'
-									? proto.HistorySync.HistorySyncType[data.syncType] || `${data.syncType}`
-									: `${data.syncType || 'unknown'}`,
-							progress: data.progress,
-							tcTokens: data.tcTokens?.length || 0,
-							nctSaltBytes: data.nctSalt?.length || 0,
-							lidPnMappings: data.lidPnMappings?.length || 0
-						},
-						'processed history sync privacy payloads'
-					)
+					if (historySyncDiagnosticsEnabled()) {
+						logger?.info(
+							{
+								syncType: data.syncType,
+								syncTypeName:
+									typeof data.syncType === 'number'
+										? proto.HistorySync.HistorySyncType[data.syncType] || `${data.syncType}`
+										: `${data.syncType || 'unknown'}`,
+								progress: data.progress,
+								tcTokens: data.tcTokens?.length || 0,
+								nctSaltBytes: data.nctSalt?.length || 0,
+								lidPnMappings: data.lidPnMappings?.length || 0
+							},
+							'processed history sync privacy payloads'
+						)
+					}
 
 					if (data.lidPnMappings?.length) {
 						logger?.debug({ count: data.lidPnMappings.length }, 'processing LID-PN mappings from history sync')
@@ -457,12 +500,16 @@ const processMessage = async (
 					if (data.nctSalt?.length) {
 						try {
 							await storeNctSalt(keyStore, data.nctSalt)
-							logger?.info({ saltBytes: data.nctSalt.length }, 'stored nct salt from history sync')
+							if (historySyncDiagnosticsEnabled()) {
+								logger?.info({ saltBytes: data.nctSalt.length }, 'stored nct salt from history sync')
+							}
 						} catch (err) {
 							logger?.warn({ err }, 'failed to store nct salt from history sync')
 						}
 					} else {
-						logger?.debug({ syncType: data.syncType, progress: data.progress }, 'history sync without nct salt')
+						if (historySyncDiagnosticsEnabled()) {
+							logger?.debug({ syncType: data.syncType, progress: data.progress }, 'history sync without nct salt')
+						}
 					}
 
 					ev.emit('messaging-history.set', {
@@ -471,6 +518,22 @@ const processMessage = async (
 						chunkOrder: histNotification.chunkOrder,
 						peerDataRequestSessionId: histNotification.peerDataRequestSessionId
 					})
+				} else {
+					if (historySyncDiagnosticsEnabled()) {
+						logger?.warn(
+							{
+								id: message.key.id,
+								syncType: histNotification.syncType,
+								syncTypeName:
+									typeof histNotification.syncType === 'number'
+										? proto.HistorySync.HistorySyncType[histNotification.syncType] || `${histNotification.syncType}`
+										: `${histNotification.syncType || 'unknown'}`,
+								chunkOrder: histNotification.chunkOrder,
+								progress: histNotification.progress
+							},
+							'skipped history sync notification before privacy payload processing'
+						)
+					}
 				}
 
 				break

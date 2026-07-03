@@ -100,10 +100,10 @@ type CsTokenParams = {
 	authState: {
 		keys: SignalKeyStoreWithTransaction
 	}
-	meLid?: string
+	recipientLid?: string
 	onDiagnostic?: (diagnostic: {
-		reason: 'missing_me_lid' | 'missing_nct_salt' | 'built' | 'error'
-		meLid?: string
+		reason: 'missing_recipient_lid' | 'missing_nct_salt' | 'built' | 'error'
+		recipientLid?: string
 		nctSaltBytes?: number
 		error?: string
 	}) => void
@@ -152,33 +152,33 @@ export async function storeNctSalt(keys: SignalKeyStoreWithTransaction, salt: Ui
 
 export async function buildCsTokenFromStoredSalt({
 	authState,
-	meLid,
+	recipientLid,
 	baseContent = [],
 	onDiagnostic
 }: CsTokenParams): Promise<BinaryNode[] | undefined> {
 	try {
-		if (!meLid) {
-			onDiagnostic?.({ reason: 'missing_me_lid' })
+		if (!recipientLid) {
+			onDiagnostic?.({ reason: 'missing_recipient_lid' })
 			return baseContent.length > 0 ? baseContent : undefined
 		}
 
 		const data = await authState.keys.get('tctoken', [NCT_SALT_KEY])
 		const nctSalt = data?.[NCT_SALT_KEY]?.nctSalt
 		if (!nctSalt?.length) {
-			onDiagnostic?.({ reason: 'missing_nct_salt', meLid, nctSaltBytes: nctSalt?.length || 0 })
+			onDiagnostic?.({ reason: 'missing_nct_salt', recipientLid, nctSaltBytes: nctSalt?.length || 0 })
 			return baseContent.length > 0 ? baseContent : undefined
 		}
 
 		baseContent.push({
 			tag: 'cstoken',
 			attrs: {},
-			content: hmacSign(Buffer.from(meLid), nctSalt)
+			content: hmacSign(Buffer.from(jidNormalizedUser(recipientLid)), nctSalt)
 		})
 
-		onDiagnostic?.({ reason: 'built', meLid, nctSaltBytes: nctSalt.length })
+		onDiagnostic?.({ reason: 'built', recipientLid: jidNormalizedUser(recipientLid), nctSaltBytes: nctSalt.length })
 		return baseContent
 	} catch (error: any) {
-		onDiagnostic?.({ reason: 'error', meLid, error: error?.message || String(error) })
+		onDiagnostic?.({ reason: 'error', recipientLid, error: error?.message || String(error) })
 		return baseContent.length > 0 ? baseContent : undefined
 	}
 }

@@ -1282,13 +1282,15 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				})
 				privacyTokenNodeTag = 'tctoken'
 			} else if (is1on1Send) {
+				const recipientLidForCsToken = isLidUser(tcTokenJid) ? tcTokenJid : undefined
 				const csTokenContent = await buildCsTokenFromStoredSalt({
 					authState,
-					meLid: authState.creds.me?.lid,
+					recipientLid: recipientLidForCsToken,
 					onDiagnostic: diagnostic => {
 						const logPayload = {
 							jid: destinationJid,
 							tcTokenJid,
+							recipientLid: recipientLidForCsToken,
 							...diagnostic
 						}
 						if (diagnostic.reason === 'built') {
