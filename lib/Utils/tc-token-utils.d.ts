@@ -45,17 +45,17 @@ type CsTokenParams = {
     authState: {
         keys: SignalKeyStoreWithTransaction;
     };
-    meLid?: string;
+    recipientLid?: string;
     onDiagnostic?: (diagnostic: {
-        reason: 'missing_me_lid' | 'missing_nct_salt' | 'built' | 'error';
-        meLid?: string;
+        reason: 'missing_recipient_lid' | 'missing_nct_salt' | 'built' | 'error';
+        recipientLid?: string;
         nctSaltBytes?: number;
         error?: string;
     }) => void;
 };
 export declare function buildTcTokenFromJid({ authState, jid, baseContent, getLIDForPN }: TcTokenParams): Promise<BinaryNode[] | undefined>;
 export declare function storeNctSalt(keys: SignalKeyStoreWithTransaction, salt: Uint8Array | Buffer | null | undefined): Promise<void>;
-export declare function buildCsTokenFromStoredSalt({ authState, meLid, baseContent, onDiagnostic }: CsTokenParams): Promise<BinaryNode[] | undefined>;
+export declare function buildCsTokenFromStoredSalt({ authState, recipientLid, baseContent, onDiagnostic }: CsTokenParams): Promise<BinaryNode[] | undefined>;
 type StoreTcTokensParams = {
     result: BinaryNode;
     fallbackJid: string;
