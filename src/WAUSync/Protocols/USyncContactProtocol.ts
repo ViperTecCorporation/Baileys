@@ -2,6 +2,14 @@ import type { USyncQueryProtocol } from '../../Types/USync'
 import { assertNodeErrorFree, type BinaryNode } from '../../WABinary'
 import { USyncUser } from '../USyncUser'
 
+export type USyncContactProtocolResult = {
+	type: string | undefined
+	jid: string | undefined
+	lid: string | undefined
+	phoneNumber: string | undefined
+	username: string | undefined
+}
+
 export class USyncContactProtocol implements USyncQueryProtocol {
 	name = 'contact'
 
@@ -47,12 +55,18 @@ export class USyncContactProtocol implements USyncQueryProtocol {
 		}
 	}
 
-	parser(node: BinaryNode): boolean {
+	parser(node: BinaryNode): USyncContactProtocolResult | null {
 		if (node.tag === 'contact') {
 			assertNodeErrorFree(node)
-			return node?.attrs?.type === 'in'
+			return {
+				type: node.attrs.type,
+				jid: node.attrs.jid,
+				lid: node.attrs.lid,
+				phoneNumber: node.attrs.phone_number,
+				username: node.attrs.username
+			}
 		}
 
-		return false
+		return null
 	}
 }

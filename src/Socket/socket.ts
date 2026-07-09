@@ -67,6 +67,7 @@ import {
 	S_WHATSAPP_NET
 } from '../WABinary'
 import { BinaryInfo } from '../WAM/BinaryInfo.js'
+import { WamTelemetry } from '../WAM/telemetry.js'
 import { USyncQuery, USyncUser } from '../WAUSync/'
 import { WebSocketClient } from './Client'
 import { executeWMexQuery } from './mex.js'
@@ -153,6 +154,7 @@ export const makeSocket = (config: SocketConfig) => {
 	})
 
 	const ws = new WebSocketClient(url, config)
+	let wamTelemetry: WamTelemetry | undefined
 
 	ws.connect()
 
@@ -204,6 +206,7 @@ export const makeSocket = (config: SocketConfig) => {
 			logger.trace({ xml: binaryNodeToString(frame), msg: 'xml send' })
 		}
 
+		wamTelemetry?.onNodeOut(frame)
 		const buff = encodeBinaryNode(frame)
 		return sendRawMessage(buff)
 	}
@@ -594,7 +597,12 @@ export const makeSocket = (config: SocketConfig) => {
 		const results = await executeUSyncQuery(usyncQuery)
 
 		if (results) {
-			return results.list.filter(a => !!a.contact).map(({ contact, id }) => ({ jid: id, exists: contact as boolean }))
+			return results.list
+				.filter(a => !!a.contact)
+				.map(({ contact, id }) => ({
+					jid: id,
+					exists: typeof contact === 'boolean' ? contact : !!contact
+				}))
 		}
 	}
 
@@ -860,6 +868,7 @@ export const makeSocket = (config: SocketConfig) => {
 
 				anyTriggered = ws.emit(`${DEF_CALLBACK_PREFIX}${l0},,${l2}`, frame) || anyTriggered
 				anyTriggered = ws.emit(`${DEF_CALLBACK_PREFIX}${l0}`, frame) || anyTriggered
+				wamTelemetry?.onNodeIn(frame, anyTriggered)
 
 				if (!anyTriggered && logger.level === 'debug') {
 					logger.debug({ unhandled: true, msgId, fromMe: false, frame }, 'communication recv')
@@ -876,6 +885,7 @@ export const makeSocket = (config: SocketConfig) => {
 
 		closed = true
 		logger.info({ trace: error?.stack }, error ? 'connection errored' : 'connection closed')
+		wamTelemetry?.onConnectionClose()
 
 		clearInterval(keepAliveReq)
 		clearTimeout(qrTimer)
@@ -1094,6 +1104,7 @@ export const makeSocket = (config: SocketConfig) => {
 			]
 		})
 	}
+	wamTelemetry = new WamTelemetry(publicWAMBuffer, sendWAMBuffer, logger, config.wamTelemetry)
 
 	ws.on('message', onMessageReceived)
 
@@ -1199,6 +1210,7 @@ export const makeSocket = (config: SocketConfig) => {
 		ev.emit('creds.update', { me: { ...authState.creds.me!, lid: node.attrs.lid } })
 
 		ev.emit('connection.update', { connection: 'open' })
+		wamTelemetry?.onConnectionOpen()
 		void sendUnifiedSession()
 
 		if (node.attrs.lid && authState.creds.me?.id) {
@@ -1297,6 +1309,7 @@ export const makeSocket = (config: SocketConfig) => {
 		}
 
 		ev.emit('connection.update', { receivedPendingNotifications: true })
+		wamTelemetry?.onOfflineComplete()
 	})
 
 	// update credentials when required
@@ -1431,6 +1444,7 @@ export const makeSocket = (config: SocketConfig) => {
 		updateServerTimeOffset,
 		sendUnifiedSession,
 		wamBuffer: publicWAMBuffer,
+		wamTelemetry,
 		/** Waits for the connection to WA to reach a state */
 		waitForConnectionUpdate: bindWaitForConnectionUpdate(ev),
 		sendWAMBuffer,

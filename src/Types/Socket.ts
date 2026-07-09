@@ -2,6 +2,7 @@ import type { Agent } from 'https'
 import type { URL } from 'url'
 import { proto } from '../../WAProto/index.js'
 import type { ILogger } from '../Utils/logger'
+import type { WamTelemetryOptions } from '../WAM/telemetry'
 import type { AuthenticationState, LIDMapping, SignalAuthState, TransactionCapabilityOptions } from './Auth'
 import type { GroupMetadata } from './GroupMetadata'
 import { type MediaConnInfo, type WAMessageKey } from './Message'
@@ -111,6 +112,9 @@ export type SocketConfig = {
 
 	/** Timeout for the bounded privacy-token query before a 1:1 send */
 	privacyTokenQueryTimeoutMs: number
+
+	/** Optional WAM/w:stats telemetry; disabled by default unless BAILEYS_WAM_TELEMETRY=true. */
+	wamTelemetry?: WamTelemetryOptions
 
 	/** Handle ACKs with 'refresh_lid': 'true', emit 'lid-migration.update' */
 	enableLidMigrationSafety: boolean

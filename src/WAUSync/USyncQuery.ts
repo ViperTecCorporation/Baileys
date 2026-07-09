@@ -11,7 +11,7 @@ import {
 } from './Protocols'
 import { USyncUser } from './USyncUser'
 
-export type USyncQueryResultList = { [protocol: string]: unknown; id: string }
+export type USyncQueryResultList = { [protocol: string]: unknown; id: string; attrs?: Record<string, string>; __raw?: unknown }
 
 export type USyncQueryResult = {
 	list: USyncQueryResultList[]
@@ -75,6 +75,33 @@ export class USyncQuery {
 			queryResult.list = listNode.content.reduce((acc: USyncQueryResultList[], node) => {
 				const id = node?.attrs.jid
 				if (id) {
+					const raw = Array.isArray(node?.content)
+						? node.content.map(content => {
+								let contentPreview: string | undefined
+								const rawContent = content.content
+								if (typeof rawContent === 'string') {
+									contentPreview = rawContent
+								} else if (rawContent instanceof Uint8Array) {
+									try {
+										contentPreview = new TextDecoder().decode(rawContent)
+									} catch {
+										contentPreview = `<bytes:${rawContent.length}>`
+									}
+								} else if (Array.isArray(rawContent)) {
+									contentPreview = rawContent.map(child => child.tag).join(',')
+								}
+								return {
+									tag: content.tag,
+									attrs: content.attrs,
+									contentType: Array.isArray(rawContent)
+										? 'array'
+										: rawContent instanceof Uint8Array
+											? 'bytes'
+											: typeof rawContent,
+									...(contentPreview ? { contentPreview } : {})
+								}
+							})
+						: undefined
 					const data = Array.isArray(node?.content)
 						? Object.fromEntries(
 								node.content
@@ -90,7 +117,7 @@ export class USyncQuery {
 									.filter(([, b]) => b !== null) as [string, unknown][]
 							)
 						: {}
-					acc.push({ ...data, id })
+						acc.push({ ...data, id, attrs: node.attrs, ...(raw ? { __raw: raw } : {}) })
 				}
 
 				return acc
