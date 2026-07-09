@@ -13,6 +13,7 @@ export type WAMessage = proto.IWebMessageInfo & {
 	messageStubParameters?: any
 	category?: string
 	retryCount?: number
+	__privacyToken?: PrivacyTokenSendMetadata
 }
 export type WAMessageContent = proto.IMessage
 export type WAContactMessage = proto.Message.IContactMessage
@@ -390,6 +391,20 @@ export type MessageRelayOptions = MinimalRelayOptions & {
 	useUserDevicesCache?: boolean
 	/** jid list of participants for status@broadcast */
 	statusJidList?: string[]
+	/** internal send diagnostics populated by relayMessage */
+	__privacyToken?: PrivacyTokenSendMetadata
+}
+
+export type PrivacyTokenSendMetadata = {
+	required: boolean
+	tokenType: 'tc' | 'cs' | 'none' | 'not_required'
+	hasTcToken: boolean
+	hasPrivacyToken: boolean
+	destinationJid?: string
+	storageJid?: string
+	activeJid?: string
+	source?: 'cache' | 'fetch' | 'cs_salt' | 'missing' | 'not_required'
+	didFetch?: boolean
 }
 
 export type MiscMessageGenerationOptions = MinimalRelayOptions & {

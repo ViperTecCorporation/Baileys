@@ -15,6 +15,7 @@ type SendWAMBuffer = (wamBuffer: Buffer) => Promise<unknown>
 
 export type WamTelemetryOptions = {
 	enabled?: boolean
+	debugEvents?: boolean
 	flushIntervalMs?: number
 	maxEvents?: number
 }
@@ -175,12 +176,14 @@ const messageIdsFromReceipt = (node: BinaryNode) => {
 
 export const resolveWamTelemetryOptions = (options?: WamTelemetryOptions): Required<WamTelemetryOptions> => ({
 	enabled: options?.enabled ?? envFlag('BAILEYS_WAM_TELEMETRY'),
+	debugEvents: options?.debugEvents ?? envFlag('BAILEYS_WAM_TELEMETRY_DEBUG_EVENTS'),
 	flushIntervalMs: options?.flushIntervalMs ?? envNumber('BAILEYS_WAM_TELEMETRY_FLUSH_MS', DEFAULT_FLUSH_INTERVAL_MS),
 	maxEvents: options?.maxEvents ?? envNumber('BAILEYS_WAM_TELEMETRY_MAX_EVENTS', DEFAULT_MAX_EVENTS)
 })
 
 export class WamTelemetry {
 	private readonly enabled: boolean
+	private readonly debugEvents: boolean
 	private readonly flushIntervalMs: number
 	private readonly maxEvents: number
 	private readonly sentMessages = new Map<string, TrackedSend>()
@@ -198,6 +201,7 @@ export class WamTelemetry {
 	) {
 		const resolved = resolveWamTelemetryOptions(options)
 		this.enabled = resolved.enabled
+		this.debugEvents = resolved.debugEvents
 		this.flushIntervalMs = resolved.flushIntervalMs
 		this.maxEvents = resolved.maxEvents
 		if (this.enabled) {
@@ -215,7 +219,9 @@ export class WamTelemetry {
 		}
 
 		this.buffer.events.push(asEvent(name, props))
-		this.logger.debug({ event: name, props }, 'WAM_TELEMETRY_COMMIT')
+		if (this.debugEvents) {
+			this.logger.debug({ event: name, props }, 'WAM_TELEMETRY_COMMIT')
+		}
 
 		if (this.buffer.events.length >= this.maxEvents) {
 			void this.flush()
@@ -326,6 +332,10 @@ export class WamTelemetry {
 			return
 		}
 
+		if (node.tag === 'ack') {
+			return
+		}
+
 		if (!handled) {
 			this.commit('UnknownStanza', {
 				unknownStanzaTag: node.tag,
@@ -370,6 +380,9 @@ export class WamTelemetry {
 			this.logger.debug({ error, eventCount }, 'WAM_TELEMETRY_SEND_ERROR')
 		} finally {
 			this.flushing = false
+			if (this.buffer.events.length > 0) {
+				this.scheduleFlush()
+			}
 		}
 	}
 

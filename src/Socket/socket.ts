@@ -1088,7 +1088,7 @@ export const makeSocket = (config: SocketConfig) => {
 	}
 
 	const sendWAMBuffer = (wamBuffer: Buffer) => {
-		return query({
+		return sendNode({
 			tag: 'iq',
 			attrs: {
 				to: S_WHATSAPP_NET,

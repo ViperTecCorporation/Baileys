@@ -612,7 +612,9 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 	const relayMessage = async (
 		jid: string,
 		message: proto.IMessage,
-		{
+		options: MessageRelayOptions
+	) => {
+		let {
 			messageId: msgId,
 			participant,
 			additionalAttributes,
@@ -620,8 +622,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 			useUserDevicesCache,
 			useCachedGroupMetadata,
 			statusJidList
-		}: MessageRelayOptions
-	) => {
+		} = options
 		const meId = assertMeId(authState.creds)
 		const meLid = authState.creds.me?.lid
 		const isRetryResend = Boolean(participant?.jid)
@@ -1309,6 +1310,18 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				}
 			}
 
+			msgId && (options.__privacyToken = {
+				required: is1on1Send,
+				tokenType: is1on1Send ? (privacyTokenNodeTag === 'tctoken' ? 'tc' : privacyTokenNodeTag === 'cstoken' ? 'cs' : 'none') : 'not_required',
+				hasTcToken: privacyTokenNodeTag === 'tctoken',
+				hasPrivacyToken: !!privacyTokenNodeTag,
+				destinationJid,
+				storageJid: is1on1Send ? tcTokenJid : undefined,
+				activeJid: is1on1Send ? activeTcTokenJid : undefined,
+				source: !is1on1Send ? 'not_required' : privacyTokenNodeTag === 'tctoken' ? (didFetchTcToken ? 'fetch' : 'cache') : privacyTokenNodeTag === 'cstoken' ? 'cs_salt' : 'missing',
+				didFetch: didFetchTcToken
+			})
+
 			if (additionalNodes && additionalNodes.length > 0) {
 				;(stanza.content as BinaryNode[]).push(...additionalNodes)
 			}
@@ -1507,6 +1520,18 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		return result
 	}
 
+	const ensurePrivacyTokens = async (jids: string[], timeoutMs?: number) => {
+		const normalized = (jids || []).map(jid => jidNormalizedUser(jid)).filter(Boolean)
+		const result = await getPrivacyTokens(normalized, undefined, timeoutMs)
+		const storeResult = await storeTcTokensFromIqResult({
+			result,
+			fallbackJid: normalized[0],
+			keys: authState.keys,
+			getLIDForPN: signalRepository.lidMapping.getLIDForPN.bind(signalRepository.lidMapping)
+		})
+		return storeResult
+	}
+
 	const waUploadToServer = getWAUploadToServer(config, refreshMediaConn)
 
 	const waitForMsgMediaUpdate = bindWaitForEvent(ev, 'messages.media-update')
@@ -1528,6 +1553,7 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 		devicesMutex,
 		getPrivacyTokens,
 		issuePrivacyTokens: getPrivacyTokens,
+		ensurePrivacyTokens,
 		assertSessions,
 		relayMessage,
 		sendReceipt,
@@ -1691,6 +1717,9 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 				}
 				try {
 					await relayMessage(targetJid, fullMsg.message, retryRelayOptions)
+					if (retryRelayOptions.__privacyToken) {
+						fullMsg.__privacyToken = retryRelayOptions.__privacyToken
+					}
 				} catch (error) {
 					if (isRetryableStaleConnectionError(error)) {
 						throw new Boom('Send failed due to stale connection; safe to retry after reconnect', {
