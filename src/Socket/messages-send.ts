@@ -1521,11 +1521,17 @@ export const makeMessagesSocket = (config: SocketConfig) => {
 	}
 
 	const ensurePrivacyTokens = async (jids: string[], timeoutMs?: number) => {
-		const normalized = (jids || []).map(jid => jidNormalizedUser(jid)).filter(Boolean)
+		const normalized = (jids || [])
+			.map(jid => jidNormalizedUser(jid))
+			.filter((jid): jid is string => !!jid)
+		if (!normalized.length) {
+			return { stored: 0, tokenNodes: 0, tokensNodeFound: false, storedJids: [] }
+		}
+		const fallbackJid = normalized[0]!
 		const result = await getPrivacyTokens(normalized, undefined, timeoutMs)
 		const storeResult = await storeTcTokensFromIqResult({
 			result,
-			fallbackJid: normalized[0],
+			fallbackJid,
 			keys: authState.keys,
 			getLIDForPN: signalRepository.lidMapping.getLIDForPN.bind(signalRepository.lidMapping)
 		})
