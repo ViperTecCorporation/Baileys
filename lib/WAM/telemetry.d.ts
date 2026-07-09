@@ -5,6 +5,7 @@ type WamProps = Record<string, number | string | null>;
 type SendWAMBuffer = (wamBuffer: Buffer) => Promise<unknown>;
 export type WamTelemetryOptions = {
     enabled?: boolean;
+    debugEvents?: boolean;
     flushIntervalMs?: number;
     maxEvents?: number;
 };
@@ -14,6 +15,7 @@ export declare class WamTelemetry {
     private readonly sendWAMBuffer;
     private readonly logger;
     private readonly enabled;
+    private readonly debugEvents;
     private readonly flushIntervalMs;
     private readonly maxEvents;
     private readonly sentMessages;

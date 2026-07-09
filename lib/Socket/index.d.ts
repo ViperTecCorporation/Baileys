@@ -73,8 +73,14 @@ declare const makeWASocket: (config: UserFacingSocketConfig) => {
     };
     getPrivacyTokens: (jids: string[], timestamp?: number, timeoutMs?: number) => Promise<any>;
     issuePrivacyTokens: (jids: string[], timestamp?: number, timeoutMs?: number) => Promise<any>;
+    ensurePrivacyTokens: (jids: string[], timeoutMs?: number) => Promise<import("../Utils/tc-token-utils.js").StoreTcTokensResult | {
+        stored: number;
+        tokenNodes: number;
+        tokensNodeFound: boolean;
+        storedJids: never[];
+    }>;
     assertSessions: (jids: string[], force?: boolean) => Promise<boolean>;
-    relayMessage: (jid: string, message: import("../index.js").proto.IMessage, { messageId: msgId, participant, additionalAttributes, additionalNodes, useUserDevicesCache, useCachedGroupMetadata, statusJidList }: import("../index.js").MessageRelayOptions) => Promise<string>;
+    relayMessage: (jid: string, message: import("../index.js").proto.IMessage, options: import("../index.js").MessageRelayOptions) => Promise<string>;
     sendReceipt: (jid: string, participant: string | undefined, messageIds: string[], type: import("../index.js").MessageReceiptType) => Promise<void>;
     sendReceipts: (keys: import("../index.js").WAMessageKey[], type: import("../index.js").MessageReceiptType) => Promise<void>;
     readMessages: (keys: import("../index.js").WAMessageKey[]) => Promise<void>;
@@ -249,7 +255,7 @@ declare const makeWASocket: (config: UserFacingSocketConfig) => {
     wamBuffer: import("../index.js").BinaryInfo;
     wamTelemetry: import("../index.js").WamTelemetry;
     waitForConnectionUpdate: (check: (u: Partial<import("../index.js").ConnectionState>) => Promise<boolean | undefined>, timeoutMs?: number) => Promise<void>;
-    sendWAMBuffer: (wamBuffer: Buffer) => Promise<any>;
+    sendWAMBuffer: (wamBuffer: Buffer) => Promise<void>;
     executeUSyncQuery: (usyncQuery: import("../index.js").USyncQuery) => Promise<import("../index.js").USyncQueryResult | undefined>;
     onWhatsApp: (...phoneNumber: string[]) => Promise<{
         jid: string;

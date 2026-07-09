@@ -17,8 +17,14 @@ export declare const makeMessagesRecvSocket: (config: SocketConfig) => {
     };
     getPrivacyTokens: (jids: string[], timestamp?: number, timeoutMs?: number) => Promise<any>;
     issuePrivacyTokens: (jids: string[], timestamp?: number, timeoutMs?: number) => Promise<any>;
+    ensurePrivacyTokens: (jids: string[], timeoutMs?: number) => Promise<import("../Utils/tc-token-utils.js").StoreTcTokensResult | {
+        stored: number;
+        tokenNodes: number;
+        tokensNodeFound: boolean;
+        storedJids: never[];
+    }>;
     assertSessions: (jids: string[], force?: boolean) => Promise<boolean>;
-    relayMessage: (jid: string, message: proto.IMessage, { messageId: msgId, participant, additionalAttributes, additionalNodes, useUserDevicesCache, useCachedGroupMetadata, statusJidList }: MessageRelayOptions) => Promise<string>;
+    relayMessage: (jid: string, message: proto.IMessage, options: MessageRelayOptions) => Promise<string>;
     sendReceipt: (jid: string, participant: string | undefined, messageIds: string[], type: MessageReceiptType) => Promise<void>;
     sendReceipts: (keys: WAMessageKey[], type: MessageReceiptType) => Promise<void>;
     readMessages: (keys: WAMessageKey[]) => Promise<void>;
@@ -193,7 +199,7 @@ export declare const makeMessagesRecvSocket: (config: SocketConfig) => {
     wamBuffer: import("../index.js").BinaryInfo;
     wamTelemetry: import("../index.js").WamTelemetry;
     waitForConnectionUpdate: (check: (u: Partial<import("../Types/index.js").ConnectionState>) => Promise<boolean | undefined>, timeoutMs?: number) => Promise<void>;
-    sendWAMBuffer: (wamBuffer: Buffer) => Promise<any>;
+    sendWAMBuffer: (wamBuffer: Buffer) => Promise<void>;
     executeUSyncQuery: (usyncQuery: import("../index.js").USyncQuery) => Promise<import("../index.js").USyncQueryResult | undefined>;
     onWhatsApp: (...phoneNumber: string[]) => Promise<{
         jid: string;
