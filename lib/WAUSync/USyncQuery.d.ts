@@ -4,6 +4,8 @@ import { USyncUser } from './USyncUser.js';
 export type USyncQueryResultList = {
     [protocol: string]: unknown;
     id: string;
+    attrs?: Record<string, string>;
+    __raw?: unknown;
 };
 export type USyncQueryResult = {
     list: USyncQueryResultList[];

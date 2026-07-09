@@ -2,6 +2,7 @@ import { Boom } from '@hapi/boom';
 import { type NewChatMessageCapInfo, type ReachoutTimelockState, type SocketConfig } from '../Types/index.js';
 import { type BinaryNode } from '../WABinary/index.js';
 import { BinaryInfo } from '../WAM/BinaryInfo.js';
+import { WamTelemetry } from '../WAM/telemetry.js';
 import { USyncQuery } from '../WAUSync/index.js';
 import { WebSocketClient } from './Client/index.js';
 export declare const isConnectionStale: (lastDateRecv: Date | undefined, keepAliveIntervalMs: number, now?: number) => boolean;
@@ -46,6 +47,7 @@ export declare const makeSocket: (config: SocketConfig) => {
     updateServerTimeOffset: ({ attrs }: BinaryNode) => void;
     sendUnifiedSession: () => Promise<void>;
     wamBuffer: BinaryInfo;
+    wamTelemetry: WamTelemetry;
     /** Waits for the connection to WA to reach a state */
     waitForConnectionUpdate: (check: (u: Partial<import("../Types/index.js").ConnectionState>) => Promise<boolean | undefined>, timeoutMs?: number) => Promise<void>;
     sendWAMBuffer: (wamBuffer: Buffer) => Promise<any>;

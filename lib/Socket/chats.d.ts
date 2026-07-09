@@ -111,6 +111,7 @@ export declare const makeChatsSocket: (config: SocketConfig) => {
     updateServerTimeOffset: ({ attrs }: BinaryNode) => void;
     sendUnifiedSession: () => Promise<void>;
     wamBuffer: import("../index.js").BinaryInfo;
+    wamTelemetry: import("../index.js").WamTelemetry;
     waitForConnectionUpdate: (check: (u: Partial<import("../Types/index.js").ConnectionState>) => Promise<boolean | undefined>, timeoutMs?: number) => Promise<void>;
     sendWAMBuffer: (wamBuffer: Buffer) => Promise<any>;
     executeUSyncQuery: (usyncQuery: USyncQuery) => Promise<import("../WAUSync/index.js").USyncQueryResult | undefined>;
